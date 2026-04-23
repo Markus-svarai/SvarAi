@@ -30,7 +30,7 @@ export default function DemoSection() {
           ].map(x => (
             <div key={x.q} className="rounded-xl border border-ink-100 bg-white p-4">
               <p className="text-xs font-medium text-brand-700 uppercase tracking-wider">{x.hint}</p>
-              <p className="mt-2 text-sm text-ink-800">"{x.q}"</p>
+              <p className="mt-2 text-sm text-ink-800">&quot;{x.q}&quot;</p>
             </div>
           ))}
         </div>
