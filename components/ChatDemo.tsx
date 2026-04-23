@@ -540,7 +540,7 @@ export default function ChatDemo() {
         </form>
       </div>
       <p className="text-xs text-ink-500 text-center mt-3">
-        Demo – ekte booking lagres i <code className="text-ink-700">data/bookings.json</code>
+        Prøver du SvarAI? Dette er en live demo – svar genereres av AI.
       </p>
     </div>
   );
