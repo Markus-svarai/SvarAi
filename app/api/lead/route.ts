@@ -33,7 +33,7 @@ async function sendNotification(lead: Lead): Promise<boolean> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "SvarAI <onboarding@resend.dev>",
+        from: "SvarAI <hei@svarai.no>",
         to: [NOTIFY_EMAIL],
         subject: `🎯 Ny demo-forespørsel: ${lead.clinic}`,
         html: `
