@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+.DS_Store
+.env*.local
+*.log
+.vercel
+next-env.d.ts
+data/bookings.json
+data/leads.json
