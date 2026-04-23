@@ -6,6 +6,7 @@ import HowItWorks from "@/components/HowItWorks";
 import Benefits from "@/components/Benefits";
 import DemoSection from "@/components/DemoSection";
 import Pricing from "@/components/Pricing";
+import Testimonials from "@/components/Testimonials";
 import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
 
@@ -19,6 +20,7 @@ export default function Home() {
       <HowItWorks />
       <Benefits />
       <DemoSection />
+      <Testimonials />
       <Pricing />
       <CTA />
       <Footer />
