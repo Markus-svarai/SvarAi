@@ -14,6 +14,7 @@ export default function Nav() {
           <a href="#hvordan" className="hover:text-ink-900 transition">Hvordan</a>
           <a href="#fordeler" className="hover:text-ink-900 transition">Fordeler</a>
           <a href="#demo" className="hover:text-ink-900 transition">Demo</a>
+          <a href="#priser" className="hover:text-ink-900 transition">Priser</a>
         </nav>
 
         <div className="flex items-center gap-3">
