@@ -3,7 +3,7 @@ import Link from "next/link";
 const plans = [
   {
     name: "Starter",
-    price: 990,
+    price: 1990,
     description: "Perfekt for små klinikker som vil komme i gang.",
     features: [
       "AI-resepsjonist på nettsiden",
@@ -17,7 +17,7 @@ const plans = [
   },
   {
     name: "Pro",
-    price: 1990,
+    price: 3990,
     description: "For klinikker som vil automatisere resepsjonen fullt ut.",
     features: [
       "Alt i Starter",
