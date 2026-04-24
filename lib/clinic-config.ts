@@ -34,19 +34,19 @@ export type ClinicConfig = {
 };
 
 export const clinicConfig: ClinicConfig = {
-  name: "Oslo Klinikk",
+  name: "Din Klinikk AS",
   type: "generell",
-  tagline: "Din lokale klinikk i hjertet av Oslo",
+  tagline: "Din lokale klinikk",
   address: {
-    street: "Karl Johans gate 12",
-    postalCode: "0154",
+    street: "Eksempelgaten 1",
+    postalCode: "0001",
     city: "Oslo",
     country: "Norge",
   },
   contact: {
     phone: "+47 22 00 11 22",
-    email: "post@osloklinikk.no",
-    website: "www.osloklinikk.no",
+    email: "post@dinklinikk.no",
+    website: "www.dinklinikk.no",
   },
   openingHours: [
     { day: "Mandag", open: "08:00", close: "18:00" },
