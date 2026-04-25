@@ -53,9 +53,11 @@ export default function WidgetPage() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const clinicId = typeof window !== "undefined"
-    ? new URLSearchParams(window.location.search).get("id") ?? "demo"
-    : "demo";
+  const params = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search)
+    : new URLSearchParams();
+  const clinicId = params.get("id") ?? "demo";
+  const brandColor = "#" + (params.get("color") ?? "6c63ff");
 
   useEffect(() => {
     // Welcome message
@@ -266,7 +268,7 @@ export default function WidgetPage() {
           width: 36,
           height: 36,
           borderRadius: "50%",
-          background: "linear-gradient(135deg, #6c63ff 0%, #5a52d5 100%)",
+          background: brandColor,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -315,7 +317,7 @@ export default function WidgetPage() {
                 width: 28,
                 height: 28,
                 borderRadius: "50%",
-                background: "linear-gradient(135deg, #6c63ff 0%, #5a52d5 100%)",
+                background: brandColor,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -343,7 +345,7 @@ export default function WidgetPage() {
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
             <div style={{
               width: 28, height: 28, borderRadius: "50%",
-              background: "linear-gradient(135deg, #6c63ff 0%, #5a52d5 100%)",
+              background: brandColor,
               display: "flex", alignItems: "center", justifyContent: "center",
               color: "white", fontWeight: 700, fontSize: 11, flexShrink: 0,
             }}>S</div>
@@ -427,7 +429,7 @@ export default function WidgetPage() {
             outline: "none",
             background: "#fafafa",
           }}
-          onFocus={e => { e.target.style.borderColor = "#6c63ff"; e.target.style.background = "#fff"; }}
+          onFocus={e => { e.target.style.borderColor = brandColor; e.target.style.background = "#fff"; }}
           onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.background = "#fafafa"; }}
         />
         <button

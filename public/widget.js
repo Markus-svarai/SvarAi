@@ -22,18 +22,23 @@
   var button = null;
   var badge = null;
 
-  // --- Extract clinic ID from script tag ---
-  function getClinicId() {
+  // --- Extract params from script tag ---
+  function getScriptParam(name, fallback) {
     var scripts = document.querySelectorAll('script[src*="widget.js"]');
     for (var i = 0; i < scripts.length; i++) {
       var src = scripts[i].getAttribute("src") || "";
-      var match = src.match(/[?&]id=([^&]+)/);
-      if (match) return match[1];
+      var re = new RegExp("[?&]" + name + "=([^&]+)");
+      var match = src.match(re);
+      if (match) return decodeURIComponent(match[1]);
     }
-    return "demo";
+    return fallback;
   }
 
-  var clinicId = getClinicId();
+  var clinicId = getScriptParam("id", "demo");
+  // Color: pass hex WITHOUT the # sign, e.g. ?color=16a34a
+  var brandColor = "#" + getScriptParam("color", "6c63ff");
+  // Darker shade for hover (simple darkening via opacity overlay)
+  var brandColorDark = "#" + getScriptParam("color", "5a52d5");
 
   // --- CSS injection ---
   function injectStyles() {
@@ -75,21 +80,22 @@
       "  width: 56px;",
       "  height: 56px;",
       "  border-radius: 50%;",
-      "  background: linear-gradient(135deg, #6c63ff 0%, #5a52d5 100%);",
+      "  background: " + brandColor + ";",
       "  border: none;",
       "  cursor: pointer;",
-      "  box-shadow: 0 4px 20px rgba(108,99,255,0.45);",
+      "  box-shadow: 0 4px 20px " + brandColor + "66;",
       "  display: flex;",
       "  align-items: center;",
       "  justify-content: center;",
-      "  transition: transform 0.2s ease, box-shadow 0.2s ease;",
+      "  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;",
       "  position: relative;",
       "  flex-shrink: 0;",
       "}",
 
       "#svarai-btn:hover {",
       "  transform: scale(1.08);",
-      "  box-shadow: 0 6px 28px rgba(108,99,255,0.55);",
+      "  filter: brightness(1.12);",
+      "  box-shadow: 0 6px 28px " + brandColor + "88;",
       "}",
 
       "#svarai-btn-icon {",
@@ -153,7 +159,7 @@
 
     iframe = document.createElement("iframe");
     iframe.id = "svarai-chat-frame";
-    iframe.src = SVARAI_BASE + "/widget?id=" + encodeURIComponent(clinicId);
+    iframe.src = SVARAI_BASE + "/widget?id=" + encodeURIComponent(clinicId) + "&color=" + encodeURIComponent(getScriptParam("color", "6c63ff"));
     iframe.title = "SvarAI Chat";
     iframe.setAttribute("allow", "microphone");
 
