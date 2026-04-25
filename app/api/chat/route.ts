@@ -261,9 +261,39 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
     };
   }
 
-  // 11) Fallback – always helpful and positive
+  // 11) Smart fallback – ask ONE follow-up question based on context
+  const lastTopics = history
+    .filter(h => h.role === "user")
+    .map(h => norm(h.content))
+    .join(" ");
+
+  // If they've been asking about booking
+  if (matchAny(lastTopics, ["book", "time", "bestill", "avtale"])) {
+    return {
+      reply: "Hvilken behandling gjelder det? Er det tannrens, undersøkelse, eller har du vondt et sted?",
+      suggestions: ["Tannrens", "Undersøkelse", "Jeg har tannpine", "Fyllning"],
+    };
+  }
+
+  // If they've been asking about prices
+  if (matchAny(lastTopics, ["pris", "kost", "betale"])) {
+    return {
+      reply: "Hvilken behandling lurer du på prisen for? Jeg finner det med én gang.",
+      suggestions: ["Tannrens", "Fyllning", "Undersøkelse", "Tannuttrekking"],
+    };
+  }
+
+  // If they seem to be describing a problem
+  if (matchAny(m, ["tann", "munn", "kjeve", "gom", "leppe", "bite", "tygge"])) {
+    return {
+      reply: "Det høres ut som du har et spørsmål om tannen din. Kan du beskrive litt mer hva du kjenner – er det smerte, følsomhet, eller noe annet?",
+      suggestions: ["Det gjør vondt", "Følsomt for kaldt", "Noe løst eller brukket", "Blødende tannkjøtt"],
+    };
+  }
+
+  // Generic fallback – one open question, never repeating
   return {
-    reply: `Godt spørsmål! 😊 Her er hva jeg kan hjelpe deg med akkurat nå:\n\n🦷 **Har du vondt eller ubehag?** – beskriv symptomet ditt, så finner jeg riktig behandling for deg\n📅 **Vil du bestille time?** – jeg finner ledig tid med én gang\n💰 **Lurer du på priser?** – jeg gir deg full oversikt\n🕐 **Åpningstider eller adresse?** – bare spør!\n\nBare skriv hva som plager deg, så tar jeg det derfra! 👇`,
+    reply: "Jeg vil gjerne hjelpe deg! Kan du si litt mer om hva det gjelder? Er det en time du vil bestille, noe som gjør vondt, eller lurer du på priser?",
     suggestions: ["Jeg har tannpine", "Book time", "Se priser", "Åpningstider"],
   };
 }
