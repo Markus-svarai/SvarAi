@@ -43,6 +43,7 @@ export default function WidgetPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>(["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]);
+  const [blocked, setBlocked] = useState(false);
 
   // Booking state
   const [bookingStep, setBookingStep] = useState<BookingStep>("idle");
@@ -60,11 +61,25 @@ export default function WidgetPage() {
   const brandColor = "#" + (params.get("color") ?? "6c63ff");
 
   useEffect(() => {
-    // Welcome message
-    addAssistantMessage(
-      "Hei! 👋 Jeg er den digitale resepsjonisten. Hva kan jeg hjelpe deg med?",
-      ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]
-    );
+    // Check if this clinic has an active subscription
+    fetch(`/api/widget-check?id=${encodeURIComponent(clinicId)}`)
+      .then(res => {
+        if (!res.ok) {
+          setBlocked(true);
+        } else {
+          addAssistantMessage(
+            "Hei! 👋 Jeg er den digitale resepsjonisten. Hva kan jeg hjelpe deg med?",
+            ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]
+          );
+        }
+      })
+      .catch(() => {
+        // On network error, allow through (fail open — better UX than blocking)
+        addAssistantMessage(
+          "Hei! 👋 Jeg er den digitale resepsjonisten. Hva kan jeg hjelpe deg med?",
+          ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]
+        );
+      });
   }, []);
 
   useEffect(() => {
@@ -243,6 +258,29 @@ export default function WidgetPage() {
     }
 
     send(s);
+  }
+
+  if (blocked) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100vh",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        background: "#ffffff",
+        padding: 24,
+        textAlign: "center",
+      }}>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style={{ marginBottom: 16 }}>
+          <circle cx="12" cy="12" r="10" stroke="#d1d5db" strokeWidth="1.5"/>
+          <path d="M8 8l8 8M16 8l-8 8" stroke="#d1d5db" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+        <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>Chat er ikke tilgjengelig.</p>
+        <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>Ta kontakt med klinikken direkte.</p>
+      </div>
+    );
   }
 
   return (
