@@ -8,7 +8,7 @@ export default function Hero() {
         <div className="flex flex-col items-center text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white/70 backdrop-blur px-3 py-1 text-xs text-ink-600 shadow-soft">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-500 animate-pulse-soft" />
-            Brukt av klinikker over hele Norge
+            Bygget for klinikker i Norge
           </div>
 
           <h1 className="mt-6 text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight text-gradient max-w-4xl leading-[1.05]">
