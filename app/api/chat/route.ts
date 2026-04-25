@@ -261,10 +261,10 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
     };
   }
 
-  // 11) Fallback
+  // 11) Fallback – always helpful and positive
   return {
-    reply: `Jeg er ikke helt sikker på hva du mener, men jeg kan hjelpe deg med:\n\n• **Symptomer og tannpine** – beskriv hva du kjenner\n• **Booking** – bestille time\n• **Priser og tjenester**\n• **Åpningstider og adresse**\n\nHva gjelder det?`,
-    suggestions: ["Jeg har tannpine", "Book time", "Priser", "Åpningstider"],
+    reply: `Godt spørsmål! 😊 Her er hva jeg kan hjelpe deg med akkurat nå:\n\n🦷 **Har du vondt eller ubehag?** – beskriv symptomet ditt, så finner jeg riktig behandling for deg\n📅 **Vil du bestille time?** – jeg finner ledig tid med én gang\n💰 **Lurer du på priser?** – jeg gir deg full oversikt\n🕐 **Åpningstider eller adresse?** – bare spør!\n\nBare skriv hva som plager deg, så tar jeg det derfra! 👇`,
+    suggestions: ["Jeg har tannpine", "Book time", "Se priser", "Åpningstider"],
   };
 }
 
