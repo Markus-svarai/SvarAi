@@ -143,7 +143,17 @@ export default function Pricing() {
           ))}
         </div>
 
-        <p className="mt-8 text-sm text-ink-500">
+        <div className="mt-10 flex items-start gap-3 max-w-md rounded-xl border border-brand-100 bg-brand-50/50 p-4">
+          <svg className="h-5 w-5 text-brand-500 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold text-ink-900">Ikke fornøyd? Pengene tilbake.</p>
+            <p className="text-sm text-ink-500 mt-0.5">Hvis du ikke er fornøyd etter første måned refunderer vi hele beløpet – ingen spørsmål stilt.</p>
+          </div>
+        </div>
+
+        <p className="mt-6 text-sm text-ink-500">
           Alle priser er ekskl. mva. Spørsmål?{" "}
           <a href="mailto:Markus08aasheim@gmail.com" className="text-brand-700 hover:underline">
             Ta kontakt med oss
