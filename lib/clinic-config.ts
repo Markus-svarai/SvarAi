@@ -8,7 +8,7 @@ export type ClinicService = {
 
 export type OpeningHour = {
   day: "Mandag" | "Tirsdag" | "Onsdag" | "Torsdag" | "Fredag" | "Lørdag" | "Søndag";
-  open: string | null; // "08:00" or null if closed
+  open: string | null;
   close: string | null;
 };
 
@@ -35,8 +35,8 @@ export type ClinicConfig = {
 
 export const clinicConfig: ClinicConfig = {
   name: "Din Klinikk AS",
-  type: "generell",
-  tagline: "Din lokale klinikk",
+  type: "tannlege",
+  tagline: "Trygg tannbehandling for hele familien",
   address: {
     street: "Eksempelgaten 1",
     postalCode: "0001",
@@ -49,64 +49,63 @@ export const clinicConfig: ClinicConfig = {
     website: "www.dinklinikk.no",
   },
   openingHours: [
-    { day: "Mandag", open: "08:00", close: "18:00" },
-    { day: "Tirsdag", open: "08:00", close: "18:00" },
-    { day: "Onsdag", open: "08:00", close: "18:00" },
-    { day: "Torsdag", open: "08:00", close: "20:00" },
-    { day: "Fredag", open: "08:00", close: "16:00" },
-    { day: "Lørdag", open: "10:00", close: "14:00" },
-    { day: "Søndag", open: null, close: null },
+    { day: "Mandag",   open: "08:00", close: "17:00" },
+    { day: "Tirsdag",  open: "08:00", close: "17:00" },
+    { day: "Onsdag",   open: "08:00", close: "17:00" },
+    { day: "Torsdag",  open: "08:00", close: "19:00" },
+    { day: "Fredag",   open: "08:00", close: "15:00" },
+    { day: "Lørdag",   open: null,    close: null },
+    { day: "Søndag",   open: null,    close: null },
   ],
   services: [
     {
-      id: "konsultasjon",
-      name: "Allmenn konsultasjon",
-      description: "Generell legekonsultasjon med erfaren allmennlege.",
+      id: "akutt",
+      name: "Akuttkonsultasjon",
+      description: "Rask hjelp ved tannpine, hevelse eller brukket tann. Vi ser på deg samme dag.",
       durationMinutes: 30,
-      priceNok: 690,
+      priceNok: 890,
     },
     {
-      id: "helsesjekk",
-      name: "Helsesjekk (utvidet)",
-      description: "Full kroppsundersøkelse med blodprøver og EKG.",
+      id: "undersokelse",
+      name: "Undersøkelse og røntgen",
+      description: "Full undersøkelse av tenner og tannkjøtt, inkludert røntgenbilde.",
+      durationMinutes: 45,
+      priceNok: 790,
+    },
+    {
+      id: "fyllning",
+      name: "Fyllning (hull i tann)",
+      description: "Behandling av karies og hull. Hvit komposittfyllning som matcher tannfargen.",
+      durationMinutes: 45,
+      priceNok: 1290,
+    },
+    {
+      id: "tannrens",
+      name: "Tannrens og puss",
+      description: "Profesjonell rens som fjerner tannstein og misfarging. Anbefales hvert halvår.",
       durationMinutes: 60,
-      priceNok: 1890,
-    },
-    {
-      id: "vaksinering",
-      name: "Vaksinering",
-      description: "Reise- og sesongvaksiner. Pris avhenger av vaksine.",
-      durationMinutes: 15,
-      priceNok: 450,
-    },
-    {
-      id: "blodprover",
-      name: "Blodprøver",
-      description: "Rutineblodprøver med rask svartid.",
-      durationMinutes: 20,
-      priceNok: 590,
-    },
-    {
-      id: "hudsjekk",
-      name: "Hudsjekk / føflekkontroll",
-      description: "Undersøkelse av føflekker og hudforandringer.",
-      durationMinutes: 30,
       priceNok: 990,
     },
     {
-      id: "attester",
-      name: "Attester & helseerklæringer",
-      description: "Førerkortattest, helseattest, reisehelse m.m.",
-      durationMinutes: 20,
-      priceNok: 790,
+      id: "rotfylling",
+      name: "Rotfylling",
+      description: "Behandling av infisert tannrot for å redde tannen. Utføres over 1–2 besøk.",
+      durationMinutes: 90,
+      priceNok: 4500,
+    },
+    {
+      id: "trekking",
+      name: "Tannuttrekking",
+      description: "Uttrekking av tann under lokalbedøvelse. Inkludert visdomstann.",
+      durationMinutes: 45,
+      priceNok: 1490,
     },
   ],
   cancellationPolicy:
-    "Avbestilling må gjøres senest 24 timer før timen. Ved senere avbestilling eller uteblivelse belastes et gebyr på 450 kr.",
+    "Avbestilling må gjøres senest 24 timer før timen. Ved senere avbestilling eller uteblivelse belastes et gebyr på 490 kr.",
   bookingLeadHours: 2,
 };
 
-// Helper: returns true if clinic is open right now (server-time; demo-friendly).
 export function isOpenNow(config: ClinicConfig, date: Date = new Date()): boolean {
   const days: OpeningHour["day"][] = [
     "Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag",

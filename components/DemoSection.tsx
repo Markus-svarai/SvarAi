@@ -11,9 +11,8 @@ export default function DemoSection() {
             Prøv SvarAI akkurat som pasientene dine ville gjort.
           </h2>
           <p className="mt-5 text-lg text-ink-600 leading-relaxed">
-            Under ser du en demo trent på <strong>{clinicConfig.name}</strong>. Spør om
-            åpningstider, priser, adresse, eller bestill en time. Det føles som
-            å chatte med resepsjonisten – men den er aldri opptatt.
+            Beskriv symptomene dine, spør om priser og åpningstider, eller bestill time direkte.
+            SvarAI forstår hva du trenger og hjelper deg til riktig behandling – akkurat som en resepsjonist, men aldri opptatt.
           </p>
         </div>
 
@@ -23,10 +22,10 @@ export default function DemoSection() {
 
         <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm text-ink-600">
           {[
-            { q: "Hva koster en blodprøve?", hint: "Tjenester & priser" },
-            { q: "Når har dere åpent på lørdag?", hint: "Åpningstider" },
-            { q: "Jeg vil bestille en helsesjekk", hint: "Booking-flyt" },
-            { q: "Hvor ligger klinikken?", hint: "Adresse & kontakt" },
+            { q: "Jeg har vondt i en tann bak, det stikker og banker", hint: "Symptomforståelse" },
+            { q: "Tannen min er veldig følsom for kaldt", hint: "Diagnose & råd" },
+            { q: "Jeg vil bestille tannrens", hint: "Booking-flyt" },
+            { q: "Når har dere åpent?", hint: "Åpningstider" },
           ].map(x => (
             <div key={x.q} className="rounded-xl border border-ink-100 bg-white p-4">
               <p className="text-xs font-medium text-brand-700 uppercase tracking-wider">{x.hint}</p>
