@@ -1,5 +1,62 @@
 import Link from "next/link";
 
+const plans = [
+  {
+    name: "Starter",
+    price: 1990,
+    badge: "14 dager gratis",
+    description: "Alt du trenger for å aldri gå glipp av en pasienthenvendelse igjen.",
+    features: [
+      "AI-resepsjonist på nettsiden din",
+      "Svarer på spørsmål om priser, åpningstider og tjenester",
+      "Enkel booking-flyt for pasienter",
+      "Du får e-post ved nye henvendelser",
+      "Oppsett på under én uke",
+      "Ingen bindingstid – avslutt når du vil",
+    ],
+    cta: "Prøv gratis i 14 dager",
+    ctaHref: "#kontakt",
+    highlight: true,
+    comingSoon: false,
+  },
+  {
+    name: "Pro",
+    price: 3990,
+    badge: "Kommer snart",
+    description: "For klinikker som vil automatisere resepsjonen fullt ut.",
+    features: [
+      "Alt i Starter",
+      "Automatisk timebooking",
+      "SMS-bekreftelse til pasienter",
+      "Avbestilling og ombooking",
+      "Ubegrenset samtaler",
+      "Prioritert support",
+    ],
+    cta: "Skriv deg opp",
+    ctaHref: "#kontakt",
+    highlight: false,
+    comingSoon: true,
+  },
+  {
+    name: "Telefon",
+    price: null,
+    badge: "Kommer snart",
+    description: "En AI som faktisk tar telefonen – gjenkjenner nummeret og husker pasienten.",
+    features: [
+      "Alt i Pro",
+      "AI svarer på innkommende anrop",
+      "Gjenkjenner faste pasienter",
+      "Husker tidligere besøk og ønsker",
+      "Sender beskrivelse til ansatte før timen",
+      "Tilgjengelig døgnet rundt",
+    ],
+    cta: "Skriv deg opp",
+    ctaHref: "#kontakt",
+    highlight: false,
+    comingSoon: true,
+  },
+];
+
 export default function Pricing() {
   return (
     <section id="priser" className="py-24 bg-ink-50/40">
@@ -14,54 +71,76 @@ export default function Pricing() {
           </p>
         </div>
 
-        <div className="mt-12 max-w-md">
-          <div className="relative rounded-2xl p-8 flex flex-col bg-ink-900 text-white shadow-2xl ring-2 ring-brand-500">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <span className="inline-flex items-center rounded-full bg-brand-500 px-3 py-1 text-xs font-semibold text-white shadow">
-                14 dager gratis
-              </span>
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+          {plans.map((plan) => (
+            <div
+              key={plan.name}
+              className={`relative rounded-2xl p-8 flex flex-col ${
+                plan.highlight
+                  ? "bg-ink-900 text-white shadow-2xl ring-2 ring-brand-500"
+                  : "bg-white border border-ink-100 shadow-soft"
+              } ${plan.comingSoon ? "opacity-75" : ""}`}
+            >
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold text-white shadow ${plan.comingSoon ? "bg-ink-400" : "bg-brand-500"}`}>
+                  {plan.badge}
+                </span>
+              </div>
+
+              <p className={`text-sm font-semibold uppercase tracking-wider ${plan.highlight ? "text-brand-400" : "text-brand-700"}`}>
+                {plan.name}
+              </p>
+
+              <div className="mt-3 flex items-end gap-1">
+                {plan.price !== null ? (
+                  <>
+                    <span className={`text-4xl font-bold tracking-tight ${plan.highlight ? "text-white" : "text-ink-900"}`}>
+                      {plan.price.toLocaleString("nb-NO")}
+                    </span>
+                    <span className={`mb-1 text-sm ${plan.highlight ? "text-white/60" : "text-ink-500"}`}>
+                      kr / mnd
+                    </span>
+                  </>
+                ) : (
+                  <span className={`text-3xl font-bold tracking-tight ${plan.highlight ? "text-white" : "text-ink-900"}`}>
+                    Kontakt oss
+                  </span>
+                )}
+              </div>
+
+              <p className={`mt-2 text-sm leading-relaxed ${plan.highlight ? "text-white/70" : "text-ink-500"}`}>
+                {plan.description}
+              </p>
+
+              <ul className="mt-8 space-y-3 flex-1">
+                {plan.features.map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm">
+                    <svg
+                      className={`mt-0.5 h-4 w-4 flex-shrink-0 ${plan.highlight ? "text-brand-400" : "text-brand-600"}`}
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L9 11.6l6.3-6.3a1 1 0 011.4 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className={plan.highlight ? "text-white/85" : "text-ink-700"}>{f}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-8">
+                <Link
+                  href={plan.ctaHref}
+                  className={`block w-full rounded-xl py-3 text-center text-sm font-semibold transition ${
+                    plan.highlight
+                      ? "bg-brand-500 text-white hover:bg-brand-600"
+                      : "bg-ink-900 text-white hover:bg-ink-800"
+                  }`}
+                >
+                  {plan.cta}
+                </Link>
+              </div>
             </div>
-
-            <p className="text-sm font-semibold uppercase tracking-wider text-brand-400">
-              SvarAI
-            </p>
-
-            <div className="mt-3 flex items-end gap-1">
-              <span className="text-4xl font-bold tracking-tight text-white">1 990</span>
-              <span className="mb-1 text-sm text-white/60">kr / mnd</span>
-            </div>
-
-            <p className="mt-2 text-sm leading-relaxed text-white/70">
-              Alt du trenger for å aldri gå glipp av en pasienthenvendelse igjen.
-            </p>
-
-            <ul className="mt-8 space-y-3">
-              {[
-                "AI-resepsjonist på nettsiden din",
-                "Svarer på spørsmål om priser, åpningstider og tjenester",
-                "Enkel booking-flyt for pasienter",
-                "Du får e-post ved nye henvendelser",
-                "Oppsett på under én uke",
-                "Ingen bindingstid – avslutt når du vil",
-              ].map((f) => (
-                <li key={f} className="flex items-start gap-2.5 text-sm">
-                  <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L9 11.6l6.3-6.3a1 1 0 011.4 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-white/85">{f}</span>
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-8">
-              <Link
-                href="#kontakt"
-                className="block w-full rounded-xl py-3 text-center text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 transition"
-              >
-                Prøv gratis i 14 dager
-              </Link>
-            </div>
-          </div>
+          ))}
         </div>
 
         <p className="mt-8 text-sm text-ink-500">
