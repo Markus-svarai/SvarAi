@@ -13,7 +13,7 @@ const plans = [
       "Ingen bindingstid – avslutt når du vil",
     ],
     cta: "Kom i gang nå →",
-    ctaHref: "https://buy.stripe.com/aFa6oJ5DU1Pl94g7HD3gk00",
+    ctaHref: "https://buy.stripe.com/7sY3cx5DUalR5S41jf3gk01",
     highlight: true,
     comingSoon: false,
   },

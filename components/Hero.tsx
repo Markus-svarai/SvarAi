@@ -28,7 +28,7 @@ export default function Hero() {
 
             <div className="mt-8 flex flex-col sm:flex-row items-start gap-3">
               <a
-                href="https://buy.stripe.com/aFa6oJ5DU1Pl94g7HD3gk00"
+                href="https://buy.stripe.com/7sY3cx5DUalR5S41jf3gk01"
                 className="inline-flex items-center justify-center rounded-xl bg-ink-900 text-white font-medium px-6 py-3 hover:bg-ink-800 transition shadow-soft"
               >
                 Kom i gang
