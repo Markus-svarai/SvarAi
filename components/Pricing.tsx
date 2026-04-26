@@ -1,10 +1,8 @@
-import Link from "next/link";
-
 const plans = [
   {
     name: "Starter",
-    price: 1990,
-    badge: "14 dager gratis",
+    price: 1490,
+    badge: "Mest populær",
     description: "Alt du trenger for å aldri gå glipp av en pasienthenvendelse igjen.",
     features: [
       "AI-resepsjonist på nettsiden din",
@@ -14,8 +12,8 @@ const plans = [
       "Oppsett på under én uke",
       "Ingen bindingstid – avslutt når du vil",
     ],
-    cta: "Prøv gratis i 14 dager",
-    ctaHref: "#kontakt",
+    cta: "Kom i gang nå →",
+    ctaHref: "https://buy.stripe.com/aFa6oJ5DU1Pl94g7HD3gk00",
     highlight: true,
     comingSoon: false,
   },
@@ -128,7 +126,7 @@ export default function Pricing() {
               </ul>
 
               <div className="mt-8">
-                <Link
+                <a
                   href={plan.ctaHref}
                   className={`block w-full rounded-xl py-3 text-center text-sm font-semibold transition ${
                     plan.highlight
@@ -137,7 +135,7 @@ export default function Pricing() {
                   }`}
                 >
                   {plan.cta}
-                </Link>
+                </a>
               </div>
             </div>
           ))}
