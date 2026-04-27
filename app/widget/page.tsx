@@ -297,11 +297,28 @@ export default function WidgetPage() {
         display: "flex",
         alignItems: "center",
         gap: 10,
-        padding: "12px 16px",
+        padding: "14px 16px 16px",
         borderBottom: "1px solid #f0f0f0",
         background: "#ffffff",
         flexShrink: 0,
+        position: "relative",
+        overflow: "hidden",
       }}>
+        {/* Tapering stripe pattern */}
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage: `repeating-linear-gradient(
+            -45deg,
+            transparent,
+            transparent 6px,
+            rgba(0,0,0,0.04) 6px,
+            rgba(0,0,0,0.04) 8px
+          )`,
+          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)",
+          maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)",
+          pointerEvents: "none",
+        }} />
         <div style={{
           width: 36,
           height: 36,
