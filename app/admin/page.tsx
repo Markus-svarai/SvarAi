@@ -1182,6 +1182,25 @@ export default function AdminPage() {
   const [clinicId, setClinicId] = useState("");
   const [tab, setTab] = useState("bookings");
 
+  // Super-admin bypass: les clinicId og supertoken fra URL
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const cId = params.get("clinicId");
+    const supertoken = params.get("supertoken");
+    if (cId && supertoken) {
+      // Verifiser supertoken via API og logg inn direkte
+      fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clinicId: cId, superBypass: supertoken }),
+      })
+        .then(r => r.json())
+        .then(data => { if (data.ok) setClinicId(cId); })
+        .catch(() => {});
+    }
+  }, []);
+
   if (!clinicId) return <LoginGate onAuth={id => setClinicId(id)} />;
 
   return (

@@ -27,6 +27,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const clinicId: string = (body?.clinicId ?? "demo").trim();
     const password: string = body?.password ?? "";
+    const superBypass: string = body?.superBypass ?? "";
+
+    // Super-admin bypass: gir direkte tilgang til hvilken som helst klinikk
+    const adminPw = process.env.ADMIN_PASSWORD;
+    if (adminPw && superBypass === adminPw && clinicId) {
+      return NextResponse.json({ ok: true, clinicId });
+    }
 
     if (!password) {
       return NextResponse.json({ error: "Passord er påkrevd." }, { status: 400 });
