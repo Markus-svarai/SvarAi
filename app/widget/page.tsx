@@ -61,9 +61,9 @@ export default function WidgetPage() {
   const clinicId = params.get("id") ?? "demo";
   const brandColor = "#" + (params.get("color") ?? "6c63ff");
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     // Check if this clinic has an active subscription
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     fetch(`/api/widget-check?id=${encodeURIComponent(clinicId)}`)
       .then(res => {
         if (!res.ok) {
