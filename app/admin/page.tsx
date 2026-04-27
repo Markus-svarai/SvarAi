@@ -360,7 +360,7 @@ function StaffTab({ clinicId }: { clinicId: string }) {
 
   function openNew() {
     setEditing(null);
-    setForm({ name: "", title: "" });
+    setForm({ name: "", title: "", ical_url: "" });
     setShowForm(true);
   }
 
