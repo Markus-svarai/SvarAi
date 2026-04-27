@@ -74,37 +74,30 @@ export default function AnimatedDemo() {
         </div>
 
         {/* Messages */}
-        <div className="h-80 overflow-hidden px-4 py-4 bg-ink-50/40 space-y-3 relative">
-          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }} preserveAspectRatio="none" viewBox="0 0 400 320">
-            <style>{`
-              @keyframes waveDriftA {
-                0% { transform: translateX(0px); }
-                50% { transform: translateX(12px); }
-                100% { transform: translateX(0px); }
-              }
-            `}</style>
-            {Array.from({ length: 13 }).map((_, i) => {
-              const y = 18 + i * 24;
-              const t = i / 12;
-              const opacity = 0.13 * (1 - t) * (1 - t);
-              const strokeWidth = 1.2 - t * 0.9;
-              const amp = Math.max(1.5, 5 - i * 0.2);
-              const duration = 4 + (i % 3) * 1.5;
-              const delay = (i % 4) * 0.6;
-              return (
-                <path
-                  key={i}
-                  d={`M-20,${y} C30,${y - amp} 80,${y + amp} 150,${y} S250,${y - amp} 320,${y} S380,${y + amp} 420,${y}`}
-                  fill="none"
-                  stroke="#000"
-                  strokeWidth={strokeWidth}
-                  opacity={opacity}
-                  style={{ animation: `waveDriftA ${duration}s ease-in-out ${delay}s infinite` }}
-                />
-              );
-            })}
-          </svg>
-          <div className="relative space-y-3" style={{ zIndex: 1 }}>
+        <div
+          className="h-80 overflow-hidden px-4 py-4 relative"
+          style={{ backgroundColor: "rgba(249,250,251,0.4)", perspective: "400px", perspectiveOrigin: "50% 0%" }}
+        >
+          <style>{`
+            @keyframes waveScrollB {
+              0% { background-position-x: 0px; }
+              100% { background-position-x: 60px; }
+            }
+          `}</style>
+          {/* Back layer – waves */}
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='32'%3E%3Cpath d='M0,16 C100,8 200,24 400,16 S600,8 800,16' fill='none' stroke='rgba(0,0,0,0.08)' stroke-width='1.2'/%3E%3C/svg%3E")`,
+            backgroundRepeat: "repeat-y",
+            backgroundSize: "100% 32px",
+            transform: "translateZ(-40px) scale(1.12)",
+            animation: "waveScrollB 7s linear infinite",
+            pointerEvents: "none",
+            filter: "blur(0.4px)",
+          }} />
+          {/* Front layer – messages */}
+          <div className="relative space-y-3" style={{ transform: "translateZ(0px)", zIndex: 1 }}>
           {conversation.slice(0, visibleMessages).map((msg, i) => (
             <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : ""} animate-fade-in`}>
               {msg.role === "assistant" && (
