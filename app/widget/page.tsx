@@ -63,6 +63,7 @@ export default function WidgetPage() {
 
   useEffect(() => {
     // Check if this clinic has an active subscription
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     fetch(`/api/widget-check?id=${encodeURIComponent(clinicId)}`)
       .then(res => {
         if (!res.ok) {

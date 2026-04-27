@@ -14,6 +14,7 @@ type Clinic = {
   address_city: string;
   contact_phone: string;
   contact_email: string;
+  contact_website: string;
   cancellation_policy: string;
   booking_lead_hours: number;
 };
