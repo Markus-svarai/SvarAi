@@ -472,8 +472,10 @@ export default function ChatDemo() {
             `}</style>
             {Array.from({ length: 18 }).map((_, i) => {
               const y = 20 + i * 26;
-              const opacity = Math.max(0.025, 0.11 - i * 0.005);
-              const amp = Math.max(2, 5 - i * 0.15);
+              const t = i / 17;
+              const opacity = 0.13 * (1 - t) * (1 - t);
+              const strokeWidth = 1.2 - t * 0.9;
+              const amp = Math.max(1.5, 5 - i * 0.2);
               const duration = 4 + (i % 3) * 1.5;
               const delay = (i % 4) * 0.6;
               return (
@@ -482,7 +484,7 @@ export default function ChatDemo() {
                   d={`M-20,${y} C30,${y - amp} 80,${y + amp} 150,${y} S250,${y - amp} 320,${y} S380,${y + amp} 420,${y}`}
                   fill="none"
                   stroke="#000"
-                  strokeWidth="0.8"
+                  strokeWidth={strokeWidth}
                   opacity={opacity}
                   style={{ animation: `waveDrift ${duration}s ease-in-out ${delay}s infinite` }}
                 />
