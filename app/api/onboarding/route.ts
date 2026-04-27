@@ -85,6 +85,84 @@ const DEFAULT_HOURS = [
   { day: "Søndag",   sort_order: 6, open: null,    close: null     },
 ];
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+
+async function sendWelcomeEmail(opts: {
+  clinicName: string;
+  clinicId: string;
+  adminPassword: string;
+  toEmail: string;
+}) {
+  if (!RESEND_API_KEY) return;
+  const { clinicName, clinicId, adminPassword, toEmail } = opts;
+  const adminUrl = "https://svarai.no/admin";
+  const widgetUrl = `https://svarai.no/widget?id=${clinicId}`;
+  const embedCode = `<iframe\n  src="${widgetUrl}"\n  width="420" height="620"\n  frameborder="0"\n  style="border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);"\n></iframe>`;
+
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "SvarAI <hei@svarai.no>",
+      to: [toEmail],
+      subject: `Velkommen til SvarAI – din AI-resepsjonist er klar 🎉`,
+      html: `
+        <div style="font-family: system-ui, sans-serif; max-width: 560px; color: #1a1a2e;">
+          <div style="background: #1a1a2e; border-radius: 12px 12px 0 0; padding: 24px 32px;">
+            <span style="font-size: 20px; font-weight: 700; color: #fff;">SvarAI</span>
+          </div>
+          <div style="border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px; padding: 32px;">
+
+            <h2 style="margin: 0 0 8px; font-size: 22px;">Velkommen, ${clinicName}! 🎉</h2>
+            <p style="color: #6b7280; margin: 0 0 24px;">Din AI-resepsjonist er satt opp og klar til bruk. Her er alt du trenger.</p>
+
+            <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px; padding: 20px; margin-bottom: 24px;">
+              <p style="font-weight: 700; margin: 0 0 12px; color: #92400e;">🔐 Dine innloggingsdetaljer – ta vare på disse</p>
+              <table style="font-size: 14px; width: 100%;">
+                <tr>
+                  <td style="padding: 4px 16px 4px 0; color: #78350f; font-weight: 600; width: 110px;">Admin-panel</td>
+                  <td><a href="${adminUrl}" style="color: #1a1a2e;">${adminUrl}</a></td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 16px 4px 0; color: #78350f; font-weight: 600;">Klinikk-ID</td>
+                  <td style="font-family: monospace; background: #fff; border: 1px solid #fcd34d; border-radius: 4px; padding: 2px 8px;">${clinicId}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 16px 4px 0; color: #78350f; font-weight: 600;">Passord</td>
+                  <td style="font-family: monospace; background: #fff; border: 1px solid #fcd34d; border-radius: 4px; padding: 2px 8px;">${adminPassword}</td>
+                </tr>
+              </table>
+            </div>
+
+            <h3 style="font-size: 15px; margin: 0 0 12px;">Neste steg</h3>
+            <ol style="padding-left: 20px; color: #374151; font-size: 14px; line-height: 1.8; margin: 0 0 24px;">
+              <li><a href="${adminUrl}" style="color: #4f46e5;">Logg inn i admin-panelet</a> og sjekk at tjenestene og åpningstidene stemmer</li>
+              <li><a href="${widgetUrl}" style="color: #4f46e5;">Test chat-widgeten</a> – prøv å sende en melding som om du var en pasient</li>
+              <li>Legg widgeten på nettsiden din ved å kopiere koden under</li>
+            </ol>
+
+            <div style="background: #111827; border-radius: 10px; padding: 16px; margin-bottom: 24px;">
+              <p style="color: #9ca3af; font-size: 12px; margin: 0 0 8px;">Lim inn på nettsiden din, før &lt;/body&gt;</p>
+              <code style="color: #34d399; font-family: monospace; font-size: 12px; white-space: pre-wrap; display: block;">${embedCode.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code>
+            </div>
+
+            <p style="font-size: 13px; color: #6b7280; margin: 0;">
+              Spørsmål? Svar på denne e-posten, så hjelper vi deg.<br/>
+              — Markus og teamet i SvarAI
+            </p>
+          </div>
+          <p style="font-size: 11px; color: #9ca3af; text-align: center; margin-top: 16px;">
+            SvarAI · AI-resepsjonist for norske klinikker · <a href="https://svarai.no" style="color: #9ca3af;">svarai.no</a>
+          </p>
+        </div>
+      `,
+    }),
+  }).catch(err => console.error("[onboarding] velkomst-e-post feilet:", err));
+}
+
 export async function POST(req: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Database ikke konfigurert." }, { status: 503 });
@@ -156,6 +234,14 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
       body: JSON.stringify(hoursToInsert),
+    });
+
+    // Send velkomst-e-post til klinikken
+    await sendWelcomeEmail({
+      clinicName: name.trim(),
+      clinicId,
+      adminPassword,
+      toEmail: contact_email.trim(),
     });
 
     return NextResponse.json({
