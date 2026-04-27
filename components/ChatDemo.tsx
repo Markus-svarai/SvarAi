@@ -132,9 +132,11 @@ export default function ChatDemo() {
   const [confirmation, setConfirmation] = useState<{ id: string; serviceName: string; date: string; time: string } | null>(null);
 
   const endRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages, bookingStep, confirmation]);
 
   function push(msg: Omit<Msg, "id">) {
@@ -461,6 +463,7 @@ export default function ChatDemo() {
 
         {/* Messages */}
         <div
+          ref={scrollContainerRef}
           className="h-[460px] overflow-y-auto scrollbar-thin px-4 py-5 relative"
           style={{ backgroundColor: "rgba(249,250,251,0.4)", perspective: "400px", perspectiveOrigin: "50% 0%" }}
         >

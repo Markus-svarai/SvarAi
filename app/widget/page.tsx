@@ -53,6 +53,7 @@ export default function WidgetPage() {
   }>({ serviceId: "", date: "", time: "", name: "", phone: "", email: "" });
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const params = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search)
@@ -83,7 +84,8 @@ export default function WidgetPage() {
   }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages, loading]);
 
   function addAssistantMessage(text: string, sugg?: string[]) {
@@ -355,7 +357,7 @@ export default function WidgetPage() {
       </div>
 
       {/* Messages */}
-      <div style={{
+      <div ref={scrollContainerRef} style={{
         flex: 1,
         overflowY: "auto",
         padding: "16px 12px 8px",
