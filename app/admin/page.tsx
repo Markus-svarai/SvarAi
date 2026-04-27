@@ -17,6 +17,7 @@ type Clinic = {
   contact_website: string;
   cancellation_policy: string;
   booking_lead_hours: number;
+  subscription_status?: string;
 };
 
 type Service = {
@@ -920,6 +921,54 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
+// ── Subscription Badge ─────────────────────────────────────────────────────
+
+function SubscriptionBadge({ clinicId }: { clinicId: string }) {
+  const [status, setStatus] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  useEffect(() => {
+    apiFetch(`/api/admin/clinic?clinicId=${encodeURIComponent(clinicId)}`)
+      .then(data => setStatus(data?.subscription_status ?? "inactive"))
+      .catch(() => {});
+  }, [clinicId]);
+
+  async function openPortal() {
+    setPortalLoading(true);
+    try {
+      const res = await apiFetch("/api/stripe/portal", {
+        method: "POST",
+        body: JSON.stringify({ clinicId }),
+      });
+      if (res?.url) window.location.href = res.url;
+    } catch {
+      // Ignorer feil stille
+    } finally {
+      setPortalLoading(false);
+    }
+  }
+
+  if (!status) return null;
+
+  const cfg = {
+    active:    { label: "Aktiv",         color: "bg-green-50 text-green-700 border-green-100" },
+    past_due:  { label: "Betaling feilet", color: "bg-red-50 text-red-700 border-red-100" },
+    cancelled: { label: "Avsluttet",     color: "bg-ink-100 text-ink-500 border-ink-200" },
+    inactive:  { label: "Ikke aktivert", color: "bg-amber-50 text-amber-700 border-amber-100" },
+  }[status] ?? { label: status, color: "bg-ink-100 text-ink-500 border-ink-200" };
+
+  return (
+    <button
+      onClick={openPortal}
+      disabled={portalLoading || status === "inactive"}
+      title={status === "inactive" ? "Ingen aktiv betaling" : "Administrer abonnement"}
+      className={`text-xs px-2.5 py-1 rounded-full font-medium border transition ${cfg.color} ${status !== "inactive" ? "hover:opacity-80 cursor-pointer" : "cursor-default"}`}
+    >
+      {portalLoading ? "…" : cfg.label}
+    </button>
+  );
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -947,12 +996,15 @@ export default function AdminPage() {
             <span className="text-ink-300 text-sm">·</span>
             <span className="text-sm text-ink-500">{clinicId}</span>
           </div>
-          <button
-            onClick={() => setClinicId("")}
-            className="text-xs text-ink-500 hover:text-ink-900 transition"
-          >
-            Logg ut
-          </button>
+            <div className="flex items-center gap-3">
+            <SubscriptionBadge clinicId={clinicId} />
+            <button
+              onClick={() => setClinicId("")}
+              className="text-xs text-ink-500 hover:text-ink-900 transition"
+            >
+              Logg ut
+            </button>
+          </div>
         </div>
         {/* Tabs */}
         <div className="mx-auto max-w-4xl px-4 sm:px-6">

@@ -40,6 +40,7 @@ export default function RegistrerPage() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [copied, setCopied] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   // Steg 1 – klinikk-info
   const [name, setName] = useState("");
@@ -402,6 +403,43 @@ export default function RegistrerPage() {
               >
                 Gå til admin-panel →
               </a>
+            </div>
+
+            {/* Betaling */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-4">
+              <h3 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
+                <span className="text-indigo-500">💳</span> Aktiver abonnement
+              </h3>
+              <p className="text-sm text-slate-500 mb-1">
+                <strong className="text-slate-700">499 kr/mnd</strong> – fullt tilgang til SvarAI for klinikken din.
+              </p>
+              <p className="text-xs text-slate-400 mb-4">Betaling via Stripe. Avbestill når som helst.</p>
+              <button
+                onClick={async () => {
+                  setCheckoutLoading(true);
+                  try {
+                    const res = await fetch("/api/stripe/checkout", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        clinicId: result.clinicId,
+                        clinicName: name,
+                        email: email,
+                      }),
+                    });
+                    const data = await res.json();
+                    if (data.url) window.location.href = data.url;
+                  } catch {
+                    setError("Kunne ikke starte betaling. Prøv igjen.");
+                  } finally {
+                    setCheckoutLoading(false);
+                  }
+                }}
+                disabled={checkoutLoading}
+                className="block w-full text-center bg-indigo-600 text-white rounded-xl py-3 text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60"
+              >
+                {checkoutLoading ? "Sender til betaling…" : "Betal og aktiver →"}
+              </button>
             </div>
 
             {/* Innloggingsinfo */}
