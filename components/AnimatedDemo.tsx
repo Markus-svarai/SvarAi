@@ -57,26 +57,7 @@ export default function AnimatedDemo() {
     <div className="w-full max-w-lg mx-auto">
       <div className="rounded-2xl border border-ink-100 bg-white shadow-card overflow-hidden">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-ink-100 bg-white relative overflow-hidden">
-          {/* Tapering stripe pattern */}
-          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} preserveAspectRatio="none" viewBox="0 0 400 56">
-            {[
-              { y: 10, opacity: 0.18, amp: 3 },
-              { y: 20, opacity: 0.13, amp: 4 },
-              { y: 30, opacity: 0.09, amp: 3 },
-              { y: 40, opacity: 0.05, amp: 2 },
-              { y: 50, opacity: 0.02, amp: 1.5 },
-            ].map((w, i) => (
-              <path
-                key={i}
-                d={`M0,${w.y} C50,${w.y - w.amp} 100,${w.y + w.amp} 150,${w.y} S250,${w.y - w.amp} 300,${w.y} S350,${w.y + w.amp} 400,${w.y}`}
-                fill="none"
-                stroke="#000"
-                strokeWidth="1"
-                opacity={w.opacity}
-              />
-            ))}
-          </svg>
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-ink-100 bg-white">
           <div className="relative">
             <div className="h-9 w-9 rounded-full bg-brand-500 text-white flex items-center justify-center font-semibold text-sm">
               S
@@ -93,7 +74,18 @@ export default function AnimatedDemo() {
         </div>
 
         {/* Messages */}
-        <div className="h-80 overflow-hidden px-4 py-4 bg-ink-50/40 space-y-3">
+        <div className="h-80 overflow-hidden px-4 py-4 bg-ink-50/40 space-y-3 relative">
+          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }} preserveAspectRatio="none" viewBox="0 0 400 320">
+            {[40, 90, 140, 190, 240, 290].map((y, i) => {
+              const opacity = Math.max(0.02, 0.12 - i * 0.015);
+              const amp = Math.max(1.5, 4 - i * 0.4);
+              return (
+                <path key={i} d={`M0,${y} C50,${y - amp} 100,${y + amp} 200,${y} S300,${y - amp} 400,${y}`}
+                  fill="none" stroke="#000" strokeWidth="1" opacity={opacity} />
+              );
+            })}
+          </svg>
+          <div className="relative space-y-3" style={{ zIndex: 1 }}>
           {conversation.slice(0, visibleMessages).map((msg, i) => (
             <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : ""} animate-fade-in`}>
               {msg.role === "assistant" && (
@@ -122,6 +114,7 @@ export default function AnimatedDemo() {
               </div>
             </div>
           )}
+          </div>
         </div>
 
         {/* Footer */}
