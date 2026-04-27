@@ -57,6 +57,7 @@ type StaffMember = {
   name: string;
   title: string | null;
   active: boolean;
+  ical_url: string | null;
 };
 
 const DAYS = ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"];
@@ -347,7 +348,7 @@ function StaffTab({ clinicId }: { clinicId: string }) {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
-  const [form, setForm] = useState({ name: "", title: "" });
+  const [form, setForm] = useState({ name: "", title: "", ical_url: "" });
 
   useEffect(() => {
     apiFetch(`/api/admin/staff?clinicId=${encodeURIComponent(clinicId)}`)
@@ -364,7 +365,7 @@ function StaffTab({ clinicId }: { clinicId: string }) {
 
   function openEdit(s: StaffMember) {
     setEditing(s);
-    setForm({ name: s.name, title: s.title ?? "" });
+    setForm({ name: s.name, title: s.title ?? "", ical_url: s.ical_url ?? "" });
     setShowForm(true);
   }
 
@@ -460,6 +461,19 @@ function StaffTab({ clinicId }: { clinicId: string }) {
                 className="mt-1 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
               />
             </label>
+            <label className="block sm:col-span-2">
+              <span className="text-xs font-medium text-ink-700">Kalender-URL (iCal)</span>
+              <input
+                type="url"
+                value={form.ical_url}
+                onChange={e => setForm(f => ({ ...f, ical_url: e.target.value }))}
+                placeholder="https://calendar.google.com/calendar/ical/..."
+                className="mt-1 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              />
+              <p className="mt-1 text-xs text-ink-400">
+                Lim inn iCal-lenke fra Google Calendar, Outlook, Visma eller annet system. Brukes til å unngå dobbeltbooking.
+              </p>
+            </label>
           </div>
           <div className="flex gap-2 pt-1">
             <button type="submit" disabled={saving} className="rounded-lg bg-ink-900 text-white text-sm font-medium px-4 py-2 hover:bg-ink-800 disabled:opacity-60">
@@ -487,6 +501,11 @@ function StaffTab({ clinicId }: { clinicId: string }) {
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.active ? "bg-green-50 text-green-700" : "bg-ink-100 text-ink-500"}`}>
                   {s.active ? "Aktiv" : "Inaktiv"}
                 </span>
+                {s.ical_url && (
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700">
+                    📅 Kalender synket
+                  </span>
+                )}
               </div>
               <div className="flex gap-2 shrink-0">
                 <button onClick={() => openEdit(s)} className="text-xs text-ink-600 hover:text-ink-900 border border-ink-200 rounded-lg px-2.5 py-1.5 hover:bg-ink-50 transition">

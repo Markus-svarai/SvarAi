@@ -50,15 +50,21 @@ export async function POST(req: NextRequest) {
     if (!clinic_id || !name?.trim())
       return NextResponse.json({ error: "Klinikk-ID og navn er påkrevd." }, { status: 400 });
 
+    const { ical_url } = body;
+    const icalValue = ical_url?.trim() || null;
+
     if (id) {
-      // Oppdater eksisterende
       const updated = await sb(`/clinic_staff?id=eq.${encodeURIComponent(id)}`, {
         method: "PATCH",
-        body: JSON.stringify({ name: name.trim(), title: title?.trim() ?? null, active: active ?? true }),
+        body: JSON.stringify({
+          name: name.trim(),
+          title: title?.trim() ?? null,
+          active: active ?? true,
+          ical_url: icalValue,
+        }),
       });
       return NextResponse.json(updated?.[0] ?? { ok: true });
     } else {
-      // Ny ansatt
       const created = await sb("/clinic_staff", {
         method: "POST",
         body: JSON.stringify({
@@ -66,6 +72,7 @@ export async function POST(req: NextRequest) {
           name: name.trim(),
           title: title?.trim() ?? null,
           active: true,
+          ical_url: icalValue,
         }),
       });
       return NextResponse.json(created?.[0] ?? { ok: true });

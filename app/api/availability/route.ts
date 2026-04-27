@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { fetchBusyBlocks, isBlockedByIcal } from "@/lib/ical-parser";
 
 export const runtime = "nodejs";
 
@@ -134,21 +135,37 @@ export async function GET(req: NextRequest) {
     // Generer alle mulige slots for dagen
     const allSlots = generateSlots(dayHours.open, dayHours.close, durationMinutes);
 
+    // Hent iCal-opptatthet for alle ansatte parallelt
+    const icalBusyMap = new Map<string, Awaited<ReturnType<typeof fetchBusyBlocks>>>();
+    await Promise.all(
+      staff.map(async (s: any) => {
+        if (s.ical_url) {
+          const busy = await fetchBusyBlocks(s.ical_url, date);
+          icalBusyMap.set(s.id, busy);
+        }
+      })
+    );
+
     // For hvert slot: finn hvilke ansatte som er ledige
     const result: AvailabilitySlot[] = [];
 
     for (const slotTime of allSlots) {
       const availableStaff = staff.filter((s: any) => {
-        // Finn alle bookinger for denne ansatte på denne datoen
+        // 1) Sjekk SvarAI-bookinger
         const staffBookings = bookings.filter((b: any) => b.staff_id === s.id);
-
-        // Sjekk om noen av bookingene overlapper med dette slottet
-        const busy = staffBookings.some((b: any) => {
+        const busyInDb = staffBookings.some((b: any) => {
           const bookDuration = b.duration_minutes ?? durationMinutes;
           return overlaps(slotTime, durationMinutes, b.time, bookDuration);
         });
+        if (busyInDb) return false;
 
-        return !busy;
+        // 2) Sjekk iCal-kalender (Google, Visma, Outlook etc.)
+        const icalBusy = icalBusyMap.get(s.id);
+        if (icalBusy && isBlockedByIcal(slotTime, durationMinutes, icalBusy)) {
+          return false;
+        }
+
+        return true;
       });
 
       if (availableStaff.length > 0) {
