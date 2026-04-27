@@ -57,7 +57,16 @@ export default function AnimatedDemo() {
     <div className="w-full max-w-lg mx-auto">
       <div className="rounded-2xl border border-ink-100 bg-white shadow-card overflow-hidden">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-ink-100 bg-white">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-ink-100 bg-white relative overflow-hidden">
+          {/* Tapering stripe pattern */}
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 6px, rgba(0,0,0,0.04) 6px, rgba(0,0,0,0.04) 8px)",
+            WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)",
+            maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)",
+            pointerEvents: "none",
+          }} />
           <div className="relative">
             <div className="h-9 w-9 rounded-full bg-brand-500 text-white flex items-center justify-center font-semibold text-sm">
               S
