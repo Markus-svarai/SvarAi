@@ -16,6 +16,7 @@ export default function Footer() {
             <a href="#hvordan" className="hover:text-ink-900">Hvordan</a>
             <a href="#demo" className="hover:text-ink-900">Demo</a>
             <a href="#kontakt" className="hover:text-ink-900">Kontakt</a>
+            <a href="/registrer" className="hover:text-ink-900 font-medium text-ink-700">Registrer klinikk</a>
           </div>
         </div>
 

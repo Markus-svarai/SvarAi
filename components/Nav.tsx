@@ -38,19 +38,25 @@ export default function Nav() {
           </a>
           <a
             href="#kontakt"
-            className="inline-flex items-center rounded-lg bg-ink-900 text-white text-sm font-medium px-4 py-2 hover:bg-ink-800 transition"
+            className="text-sm text-ink-700 hover:text-ink-900 transition"
           >
             Book demo
           </a>
-        </div>
-
-        {/* Mobile: Book demo + hamburger */}
-        <div className="flex md:hidden items-center gap-2">
           <a
-            href="#kontakt"
+            href="/registrer"
             className="inline-flex items-center rounded-lg bg-ink-900 text-white text-sm font-medium px-4 py-2 hover:bg-ink-800 transition"
           >
-            Book demo
+            Kom i gang →
+          </a>
+        </div>
+
+        {/* Mobile: Kom i gang + hamburger */}
+        <div className="flex md:hidden items-center gap-2">
+          <a
+            href="/registrer"
+            className="inline-flex items-center rounded-lg bg-ink-900 text-white text-sm font-medium px-4 py-2 hover:bg-ink-800 transition"
+          >
+            Kom i gang
           </a>
           <button
             onClick={() => setOpen(!open)}

@@ -28,10 +28,10 @@ export default function Hero() {
 
             <div className="mt-8 flex flex-col sm:flex-row items-start gap-3">
               <a
-                href="https://buy.stripe.com/7sY3cx5DUalR5S41jf3gk01"
+                href="/registrer"
                 className="inline-flex items-center justify-center rounded-xl bg-ink-900 text-white font-medium px-6 py-3 hover:bg-ink-800 transition shadow-soft"
               >
-                Kom i gang
+                Kom i gang gratis
                 <svg className="ml-2 h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M3 10a1 1 0 011-1h10.586l-3.293-3.293a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L14.586 11H4a1 1 0 01-1-1z" clipRule="evenodd" />
                 </svg>
