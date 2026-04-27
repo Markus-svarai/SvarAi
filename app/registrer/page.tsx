@@ -28,6 +28,7 @@ type Step = 1 | 2 | 3;
 
 type Result = {
   clinicId: string;
+  adminPassword: string;
   widgetUrl: string;
   embedCode: string;
   adminUrl: string;
@@ -403,13 +404,20 @@ export default function RegistrerPage() {
               </a>
             </div>
 
-            {/* Klinikk-ID info */}
-            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5">
-              <p className="text-sm text-indigo-800">
-                <strong>Din klinikk-ID:</strong>{" "}
-                <code className="bg-white px-2 py-0.5 rounded font-mono text-indigo-700 border border-indigo-200">{result.clinicId}</code>
-              </p>
-              <p className="text-xs text-indigo-600 mt-1">Bruk denne ID-en til å hente inn korrekt data i chatten.</p>
+            {/* Innloggingsinfo */}
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+              <p className="text-sm font-semibold text-amber-900 mb-3">⚠️ Lagre disse — du trenger dem for å logge inn i admin</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-amber-200">
+                  <span className="text-xs text-amber-700 font-medium">Klinikk-ID</span>
+                  <code className="font-mono text-sm text-amber-900">{result.clinicId}</code>
+                </div>
+                <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-amber-200">
+                  <span className="text-xs text-amber-700 font-medium">Passord</span>
+                  <code className="font-mono text-sm text-amber-900">{result.adminPassword}</code>
+                </div>
+              </div>
+              <p className="text-xs text-amber-700 mt-3">Logg inn på <strong>svarai.no/admin</strong> med disse opplysningene.</p>
             </div>
           </div>
         )}

@@ -51,7 +51,6 @@ type Booking = {
 };
 
 const DAYS = ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"];
-const CLINIC_ID = "demo";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -81,24 +80,35 @@ async function apiFetch(path: string, opts: RequestInit = {}) {
   return t ? JSON.parse(t) : null;
 }
 
-// ── Password gate ──────────────────────────────────────────────────────────
+// ── Login ──────────────────────────────────────────────────────────────────
 
-function PasswordGate({ onAuth }: { onAuth: () => void }) {
+function LoginGate({ onAuth }: { onAuth: (clinicId: string) => void }) {
+  const [clinicId, setClinicId] = useState("demo");
   const [pw, setPw] = useState("");
-  const [error, setError] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/admin/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pw }),
-    });
-    if (res.ok) {
-      onAuth();
-    } else {
-      setError(true);
-      setPw("");
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clinicId: clinicId.trim(), password: pw }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        onAuth(data.clinicId);
+      } else {
+        setError(data.error ?? "Innlogging feilet.");
+        setPw("");
+      }
+    } catch {
+      setError("Kunne ikke koble til serveren.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -111,24 +121,38 @@ function PasswordGate({ onAuth }: { onAuth: () => void }) {
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div>
+            <label className="block text-xs font-medium text-ink-700 mb-1">Klinikk-ID</label>
+            <input
+              type="text"
+              value={clinicId}
+              onChange={e => { setClinicId(e.target.value); setError(""); }}
+              className="w-full rounded-lg border border-ink-200 px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              placeholder="f.eks. rygge-tannklinikk"
+              autoFocus
+            />
+          </div>
+          <div>
             <label className="block text-xs font-medium text-ink-700 mb-1">Passord</label>
             <input
               type="password"
               value={pw}
-              onChange={e => { setPw(e.target.value); setError(false); }}
+              onChange={e => { setPw(e.target.value); setError(""); }}
               className="w-full rounded-lg border border-ink-200 px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
               placeholder="Skriv inn passord"
-              autoFocus
             />
-            {error && <p className="text-xs text-red-500 mt-1">Feil passord.</p>}
           </div>
+          {error && <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
           <button
             type="submit"
-            className="w-full rounded-lg bg-ink-900 text-white text-sm font-medium py-2.5 hover:bg-ink-800 transition"
+            disabled={loading}
+            className="w-full rounded-lg bg-ink-900 text-white text-sm font-medium py-2.5 hover:bg-ink-800 transition disabled:opacity-60"
           >
-            Logg inn
+            {loading ? "Logger inn…" : "Logg inn"}
           </button>
         </form>
+        <p className="mt-4 text-xs text-ink-400 text-center">
+          Fant du ID-en din i velkomst-e-posten eller på <a href="/registrer" className="underline hover:text-ink-600">/registrer</a>-siden.
+        </p>
       </div>
     </div>
   );
@@ -136,17 +160,17 @@ function PasswordGate({ onAuth }: { onAuth: () => void }) {
 
 // ── Tab: Bookinger ─────────────────────────────────────────────────────────
 
-function BookingsTab() {
+function BookingsTab({ clinicId }: { clinicId: string }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    apiFetch(`/api/admin/bookings?clinicId=${CLINIC_ID}`)
+    apiFetch(`/api/admin/bookings?clinicId=${encodeURIComponent(clinicId)}`)
       .then(data => setBookings(data ?? []))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [clinicId]);
 
   const statusColor = (s: string) =>
     s === "confirmed" ? "text-green-700 bg-green-50" :
@@ -199,7 +223,7 @@ function BookingsTab() {
 
 // ── Tab: Tjenester ─────────────────────────────────────────────────────────
 
-function ServicesTab() {
+function ServicesTab({ clinicId }: { clinicId: string }) {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -209,7 +233,7 @@ function ServicesTab() {
   const [showForm, setShowForm] = useState(false);
 
   const blank: Omit<Service, "id"> = {
-    clinic_id: CLINIC_ID,
+    clinic_id: clinicId,
     name: "",
     description: "",
     duration_minutes: 30,
@@ -219,15 +243,15 @@ function ServicesTab() {
   const [form, setForm] = useState<Omit<Service, "id">>(blank);
 
   useEffect(() => {
-    apiFetch(`/api/admin/services?clinicId=${CLINIC_ID}`)
+    apiFetch(`/api/admin/services?clinicId=${encodeURIComponent(clinicId)}`)
       .then(data => setServices(data ?? []))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [clinicId]);
 
   function openNew() {
     setEditing(null);
-    setForm(blank);
+    setForm({ ...blank, clinic_id: clinicId });
     setShowForm(true);
   }
 
@@ -346,7 +370,7 @@ function ServicesTab() {
 
 // ── Tab: Åpningstider ──────────────────────────────────────────────────────
 
-function HoursTab() {
+function HoursTab({ clinicId }: { clinicId: string }) {
   const [hours, setHours] = useState<Hour[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -354,19 +378,18 @@ function HoursTab() {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    apiFetch(`/api/admin/hours?clinicId=${CLINIC_ID}`)
+    apiFetch(`/api/admin/hours?clinicId=${encodeURIComponent(clinicId)}`)
       .then(data => {
         const fetched: Hour[] = data ?? [];
-        // Ensure all 7 days are represented
         const merged = DAYS.map((day, i) => {
           const existing = fetched.find(h => h.day === day);
-          return existing ?? { clinic_id: CLINIC_ID, day, sort_order: i, open: null, close: null };
+          return existing ?? { clinic_id: clinicId, day, sort_order: i, open: null, close: null };
         });
         setHours(merged);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [clinicId]);
 
   function update(day: string, field: "open" | "close", value: string | null) {
     setHours(prev => prev.map(h => h.day === day ? { ...h, [field]: value || null } : h));
@@ -386,7 +409,7 @@ function HoursTab() {
     try {
       await apiFetch("/api/admin/hours", {
         method: "POST",
-        body: JSON.stringify({ clinicId: CLINIC_ID, hours }),
+        body: JSON.stringify({ clinicId, hours }),
       });
       setSuccess("Åpningstider lagret!");
     } catch (e: any) {
@@ -452,7 +475,7 @@ function HoursTab() {
 
 // ── Tab: Klinikk-info ──────────────────────────────────────────────────────
 
-function ClinicTab() {
+function ClinicTab({ clinicId }: { clinicId: string }) {
   const [form, setForm] = useState<Partial<Clinic>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -460,11 +483,11 @@ function ClinicTab() {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    apiFetch(`/api/admin/clinic?clinicId=${CLINIC_ID}`)
+    apiFetch(`/api/admin/clinic?clinicId=${encodeURIComponent(clinicId)}`)
       .then(data => setForm(data ?? {}))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [clinicId]);
 
   function set(field: keyof Clinic, value: any) {
     setForm(f => ({ ...f, [field]: value }));
@@ -477,7 +500,7 @@ function ClinicTab() {
     try {
       await apiFetch("/api/admin/clinic", {
         method: "POST",
-        body: JSON.stringify({ ...form, id: CLINIC_ID }),
+        body: JSON.stringify({ ...form, id: clinicId }),
       });
       setSuccess("Klinikk-info lagret!");
     } catch (e: any) {
@@ -602,10 +625,10 @@ const TABS = [
 ];
 
 export default function AdminPage() {
-  const [authed, setAuthed] = useState(false);
+  const [clinicId, setClinicId] = useState("");
   const [tab, setTab] = useState("bookings");
 
-  if (!authed) return <PasswordGate onAuth={() => setAuthed(true)} />;
+  if (!clinicId) return <LoginGate onAuth={id => setClinicId(id)} />;
 
   return (
     <div className="min-h-screen bg-ink-50">
@@ -616,14 +639,14 @@ export default function AdminPage() {
             <div className="h-8 w-8 rounded-lg bg-ink-900 text-white flex items-center justify-center font-bold text-sm">S</div>
             <span className="font-semibold text-ink-900 text-sm">SvarAI</span>
             <span className="text-ink-300 text-sm">·</span>
-            <span className="text-sm text-ink-500">Admin</span>
+            <span className="text-sm text-ink-500">{clinicId}</span>
           </div>
-          <a
-            href="/"
+          <button
+            onClick={() => setClinicId("")}
             className="text-xs text-ink-500 hover:text-ink-900 transition"
           >
-            ← Tilbake til nettsiden
-          </a>
+            Logg ut
+          </button>
         </div>
         {/* Tabs */}
         <div className="mx-auto max-w-4xl px-4 sm:px-6">
@@ -647,10 +670,10 @@ export default function AdminPage() {
 
       {/* Content */}
       <main className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
-        {tab === "bookings"  && <BookingsTab />}
-        {tab === "services"  && <ServicesTab />}
-        {tab === "hours"     && <HoursTab />}
-        {tab === "clinic"    && <ClinicTab />}
+        {tab === "bookings"  && <BookingsTab clinicId={clinicId} />}
+        {tab === "services"  && <ServicesTab clinicId={clinicId} />}
+        {tab === "hours"     && <HoursTab    clinicId={clinicId} />}
+        {tab === "clinic"    && <ClinicTab   clinicId={clinicId} />}
       </main>
     </div>
   );

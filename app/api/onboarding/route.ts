@@ -22,6 +22,13 @@ async function sb(path: string, options: RequestInit = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+// Genererer et lesbart tilfeldig passord, f.eks. "kx7m-p2nq"
+function generatePassword(): string {
+  const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+  const part = (n: number) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return `${part(4)}-${part(4)}`;
+}
+
 // Genererer en URL-vennlig ID fra klinikk-navn
 function slugify(name: string): string {
   return name
@@ -107,6 +114,7 @@ export async function POST(req: NextRequest) {
     }
 
     const clinicType = type ?? "generell";
+    const adminPassword = generatePassword();
 
     // Opprett klinikk
     await sb("/clinics", {
@@ -116,6 +124,7 @@ export async function POST(req: NextRequest) {
         id: clinicId,
         name: name.trim(),
         type: clinicType,
+        admin_password: adminPassword,
         tagline: tagline?.trim() ?? "",
         address_street: address_street?.trim() ?? "",
         address_postal: address_postal?.trim() ?? "",
@@ -152,6 +161,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       clinicId,
+      adminPassword,
       embedCode: `<script src="https://svarai.no/widget.js" data-clinic="${clinicId}" defer></script>`,
       widgetUrl: `https://svarai.no/widget?id=${clinicId}`,
       adminUrl: `https://svarai.no/admin`,
