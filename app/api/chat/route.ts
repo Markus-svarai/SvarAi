@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clinicConfig, formatNok, isOpenNow } from "@/lib/clinic-config";
+import { ClinicConfig, formatNok, isOpenNow } from "@/lib/clinic-config";
+import { getClinicData } from "@/lib/get-clinic-data";
 
 export const runtime = "nodejs";
 
@@ -24,43 +25,43 @@ function matchAny(text: string, patterns: string[]): boolean {
   return patterns.some(p => n.includes(p));
 }
 
-function renderHours(): string {
-  const lines = clinicConfig.openingHours.map(h => {
+function renderHours(config: ClinicConfig): string {
+  const lines = config.openingHours.map(h => {
     if (!h.open || !h.close) return `• ${h.day}: Stengt`;
     return `• ${h.day}: ${h.open}–${h.close}`;
   });
-  const status = isOpenNow(clinicConfig)
+  const status = isOpenNow(config)
     ? "✅ Vi har åpent nå."
     : "🔒 Vi har stengt akkurat nå.";
   return `${status}\n\nÅpningstider:\n${lines.join("\n")}`;
 }
 
-function renderServices(): string {
-  const lines = clinicConfig.services.map(
+function renderServices(config: ClinicConfig): string {
+  const lines = config.services.map(
     s => `• **${s.name}** – ${formatNok(s.priceNok)} (${s.durationMinutes} min)\n   ${s.description}`
   );
   return `Her er tjenestene våre:\n\n${lines.join("\n\n")}\n\nØnsker du å bestille en time?`;
 }
 
-function renderContact(): string {
-  const a = clinicConfig.address;
+function renderContact(config: ClinicConfig): string {
+  const a = config.address;
   return [
     `📍 **Adresse:** ${a.street}, ${a.postalCode} ${a.city}`,
-    `📞 **Telefon:** ${clinicConfig.contact.phone}`,
-    `✉️ **E-post:** ${clinicConfig.contact.email}`,
-    `🌐 **Nettside:** ${clinicConfig.contact.website}`,
+    `📞 **Telefon:** ${config.contact.phone}`,
+    `✉️ **E-post:** ${config.contact.email}`,
+    `🌐 **Nettside:** ${config.contact.website}`,
   ].join("\n");
 }
 
-function renderCancellation(): string {
+function renderCancellation(config: ClinicConfig): string {
   return [
     "Du kan avbestille eller endre timen din slik:",
     "",
     `• Her i chatten – si bare "jeg vil avbestille"`,
-    `• Telefon: ${clinicConfig.contact.phone}`,
-    `• E-post: ${clinicConfig.contact.email}`,
+    `• Telefon: ${config.contact.phone}`,
+    `• E-post: ${config.contact.email}`,
     "",
-    `ℹ️ ${clinicConfig.cancellationPolicy}`,
+    `ℹ️ ${config.cancellationPolicy}`,
   ].join("\n");
 }
 
@@ -73,7 +74,16 @@ type SymptomMatch = {
   suggestions: string[];
 };
 
-function matchSymptom(m: string): SymptomMatch | null {
+function getServicePrice(config: ClinicConfig, serviceId: string, fallback: number): number {
+  const service = config.services.find(s => s.id === serviceId);
+  return service ? service.priceNok : fallback;
+}
+
+function matchSymptom(m: string, config: ClinicConfig): SymptomMatch | null {
+  const akuttPris = getServicePrice(config, "akutt", 890);
+  const undersokelsePris = getServicePrice(config, "undersokelse", 790);
+  const fyllningPris = getServicePrice(config, "fyllning", 1290);
+  const tannrensPris = getServicePrice(config, "tannrens", 990);
 
   // Akutt smerte / hevelse
   if (matchAny(m, ["vondt", "tannpine", "smerte", "verker", "banker", "stikker", "prikker", "pulserer", "hardt vondt", "veldig vondt"])) {
@@ -82,14 +92,14 @@ function matchSymptom(m: string): SymptomMatch | null {
       return {
         serviceId: "akutt",
         urgency: "akutt",
-        reply: `Det høres ut som en mulig **tanninfeksjon eller abscess** – hevelse i kjeven kan være alvorlig og bør undersøkes **så fort som mulig**.\n\n⚠️ Vi anbefaler en **akuttkonsultasjon i dag** (${formatNok(890)}, 30 min).\n\nVil du se ledige tider?`,
+        reply: `Det høres ut som en mulig **tanninfeksjon eller abscess** – hevelse i kjeven kan være alvorlig og bør undersøkes **så fort som mulig**.\n\n⚠️ Vi anbefaler en **akuttkonsultasjon i dag** (${formatNok(akuttPris)}, 30 min).\n\nVil du se ledige tider?`,
         suggestions: ["Book akuttkonsultasjon", "Ring oss", "Mer info"],
       };
     }
     return {
       serviceId: "akutt",
       urgency: "akutt",
-      reply: `Det høres ut som **tannpine** – dette kan skyldes et hull, sprukket tann, eller betennelse i tannroten.\n\n🦷 Vi anbefaler en **akuttkonsultasjon** så snart som mulig (${formatNok(890)}, 30 min). Legen vil undersøke og fortelle deg nøyaktig hva som må gjøres.\n\nVil du booke en time?`,
+      reply: `Det høres ut som **tannpine** – dette kan skyldes et hull, sprukket tann, eller betennelse i tannroten.\n\n🦷 Vi anbefaler en **akuttkonsultasjon** så snart som mulig (${formatNok(akuttPris)}, 30 min). Legen vil undersøke og fortelle deg nøyaktig hva som må gjøres.\n\nVil du booke en time?`,
       suggestions: ["Book akuttkonsultasjon", "Se alle tider", "Hva koster det?"],
     };
   }
@@ -99,7 +109,7 @@ function matchSymptom(m: string): SymptomMatch | null {
     return {
       serviceId: "akutt",
       urgency: "akutt",
-      reply: `En **brukket eller løs tann** bør undersøkes **snarest mulig** – jo raskere vi ser på det, jo større sjanse er det for å redde tannen.\n\n🦷 Vi anbefaler **akuttkonsultasjon** i dag (${formatNok(890)}, 30 min).\n\nVil du booke en time nå?`,
+      reply: `En **brukket eller løs tann** bør undersøkes **snarest mulig** – jo raskere vi ser på det, jo større sjanse er det for å redde tannen.\n\n🦷 Vi anbefaler **akuttkonsultasjon** i dag (${formatNok(akuttPris)}, 30 min).\n\nVil du booke en time nå?`,
       suggestions: ["Book akuttkonsultasjon", "Ring oss direkte", "Åpningstider"],
     };
   }
@@ -109,7 +119,7 @@ function matchSymptom(m: string): SymptomMatch | null {
     return {
       serviceId: "fyllning",
       urgency: "snart",
-      reply: `Det høres ut som du trenger en **fyllning** – dette er en vanlig behandling der vi fjerner karies og fyller hullet med en hvit komposittfyllning.\n\n🦷 **Fyllning:** ${formatNok(1290)}, ca. 45 min. Smertefritt med lokalbedøvelse.\n\nVil du booke en time?`,
+      reply: `Det høres ut som du trenger en **fyllning** – dette er en vanlig behandling der vi fjerner karies og fyller hullet med en hvit komposittfyllning.\n\n🦷 **Fyllning:** ${formatNok(fyllningPris)}, ca. 45 min. Smertefritt med lokalbedøvelse.\n\nVil du booke en time?`,
       suggestions: ["Book fyllning", "Hva skjer under behandlingen?", "Se priser"],
     };
   }
@@ -119,7 +129,7 @@ function matchSymptom(m: string): SymptomMatch | null {
     return {
       serviceId: "undersokelse",
       urgency: "snart",
-      reply: `**Følsomhet for kaldt, varmt eller søtt** kan tyde på:\n\n• Hull (karies) i en tann\n• Slitt tannemalje\n• Tannhalsen er blottlagt\n\n🦷 Vi anbefaler en **undersøkelse** så vi finner årsaken og kan gi riktig behandling (${formatNok(790)}, 45 min inkl. røntgen).\n\nVil du booke en undersøkelse?`,
+      reply: `**Følsomhet for kaldt, varmt eller søtt** kan tyde på:\n\n• Hull (karies) i en tann\n• Slitt tannemalje\n• Tannhalsen er blottlagt\n\n🦷 Vi anbefaler en **undersøkelse** så vi finner årsaken og kan gi riktig behandling (${formatNok(undersokelsePris)}, 45 min inkl. røntgen).\n\nVil du booke en undersøkelse?`,
       suggestions: ["Book undersøkelse", "Se priser", "Åpningstider"],
     };
   }
@@ -129,7 +139,7 @@ function matchSymptom(m: string): SymptomMatch | null {
     return {
       serviceId: "tannrens",
       urgency: "snart",
-      reply: `**Blødende eller betent tannkjøtt** er ofte et tegn på **tannkjøttbetennelse (gingivitt)** eller **periodontitt**. Det er viktig å ta det på alvor – ubehandlet kan det føre til tannløsning.\n\n🦷 Vi anbefaler **tannrens og undersøkelse** (${formatNok(990)}, 60 min) for å fjerne bakterier og vurdere tilstanden.\n\nVil du booke en time?`,
+      reply: `**Blødende eller betent tannkjøtt** er ofte et tegn på **tannkjøttbetennelse (gingivitt)** eller **periodontitt**. Det er viktig å ta det på alvor – ubehandlet kan det føre til tannløsning.\n\n🦷 Vi anbefaler **tannrens og undersøkelse** (${formatNok(tannrensPris)}, 60 min) for å fjerne bakterier og vurdere tilstanden.\n\nVil du booke en time?`,
       suggestions: ["Book tannrens", "Hva er periodontitt?", "Se priser"],
     };
   }
@@ -139,7 +149,7 @@ function matchSymptom(m: string): SymptomMatch | null {
     return {
       serviceId: "trekking",
       urgency: "snart",
-      reply: `Problemer med **visdomstenner** er veldig vanlig. De kan:\n\n• Vokse skjevt og dytte på andre tenner\n• Bli delvis gjennombrutt og infisert\n• Skape vondt og hevelse\n\n🦷 Vi anbefaler en **undersøkelse med røntgen** (${formatNok(790)}) for å se hvordan visdomstannen ligger. Deretter vurderer vi om den bør trekkes.\n\nVil du booke?`,
+      reply: `Problemer med **visdomstenner** er veldig vanlig. De kan:\n\n• Vokse skjevt og dytte på andre tenner\n• Bli delvis gjennombrutt og infisert\n• Skape vondt og hevelse\n\n🦷 Vi anbefaler en **undersøkelse med røntgen** (${formatNok(undersokelsePris)}) for å se hvordan visdomstannen ligger. Deretter vurderer vi om den bør trekkes.\n\nVil du booke?`,
       suggestions: ["Book undersøkelse", "Hva koster uttrekking?", "Åpningstider"],
     };
   }
@@ -149,7 +159,7 @@ function matchSymptom(m: string): SymptomMatch | null {
     return {
       serviceId: "tannrens",
       urgency: "rutine",
-      reply: `**Regelmessig tannrens** anbefales minst hvert halvår. Vi fjerner tannstein, pussen tennene og sjekker at alt er bra.\n\n🦷 **Tannrens og puss:** ${formatNok(990)}, 60 min.\n\nVil du booke en time?`,
+      reply: `**Regelmessig tannrens** anbefales minst hvert halvår. Vi fjerner tannstein, pussen tennene og sjekker at alt er bra.\n\n🦷 **Tannrens og puss:** ${formatNok(tannrensPris)}, 60 min.\n\nVil du booke en time?`,
       suggestions: ["Book tannrens", "Se åpningstider", "Priser"],
     };
   }
@@ -165,12 +175,12 @@ function isUrgent(m: string): boolean {
   return matchAny(m, ["i dag", "nå", "asap", "snarest", "så fort", "med en gang", "akutt", "umiddelbart", "første ledige", "første mulige", "så snart"]);
 }
 
-function route(message: string, history: ChatMessage[]): ChatResponse {
+function route(message: string, history: ChatMessage[], config: ClinicConfig): ChatResponse {
   const m = norm(message);
   const urgent = isUrgent(m);
 
-  // 1) Symptom check — if urgent, skip treatment selection and go straight to booking
-  const symptom = matchSymptom(m);
+  // 1) Symptom check
+  const symptom = matchSymptom(m, config);
   if (symptom) {
     if (urgent || symptom.urgency === "akutt") {
       const times = TODAY_TIMES.slice(0, 4);
@@ -192,7 +202,6 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
     matchAny(m, ["book", "bestille", "bestill", "reservere", "sette opp", "time", "avtale", "ledig time", "ny time"]) &&
     !matchAny(m, ["avbest", "avlys", "kansell", "flytte", "endre"])
   ) {
-    // Urgent: skip treatment choice, show today's times immediately
     if (urgent) {
       const times = TODAY_TIMES.slice(0, 4);
       return {
@@ -202,7 +211,7 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
       };
     }
 
-    const matchedService = clinicConfig.services.find(s =>
+    const matchedService = config.services.find(s =>
       m.includes(norm(s.name)) || m.includes(s.id)
     );
     return {
@@ -214,7 +223,7 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
     };
   }
 
-  // 2b) "Første ledige" — skip everything, show times now
+  // 2b) "Første ledige"
   if (matchAny(m, ["første ledige", "første mulige", "når er dere ledig", "når har dere ledig"])) {
     const times = TODAY_TIMES.slice(0, 4);
     return {
@@ -227,7 +236,7 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
   // 3) Cancellation
   if (matchAny(m, ["avbest", "avlys", "kansell", "flytte time", "endre time"])) {
     return {
-      reply: renderCancellation(),
+      reply: renderCancellation(config),
       suggestions: ["Book ny time", "Åpningstider", "Priser"],
     };
   }
@@ -235,14 +244,14 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
   // 4) Opening hours
   if (matchAny(m, ["åpningstid", "åpent", "stengt", "åpner", "stenger", "når har dere åpent"])) {
     return {
-      reply: renderHours(),
+      reply: renderHours(config),
       suggestions: ["Book time", "Se tjenester", "Adresse"],
     };
   }
 
   // 5) Services & prices
   if (matchAny(m, ["tjenest", "behandling", "pris", "koste", "kost", "hva koster", "tilbud", "oversikt"])) {
-    const matched = clinicConfig.services.find(s =>
+    const matched = config.services.find(s =>
       m.includes(norm(s.name)) || m.includes(s.id)
     );
     if (matched) {
@@ -252,7 +261,7 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
       };
     }
     return {
-      reply: renderServices(),
+      reply: renderServices(config),
       suggestions: ["Book time", "Åpningstider", "Adresse"],
     };
   }
@@ -260,7 +269,7 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
   // 6) Address / contact
   if (matchAny(m, ["adresse", "hvor ligger", "telefon", "kontakt", "e-post", "mail"])) {
     return {
-      reply: renderContact(),
+      reply: renderContact(config),
       suggestions: ["Åpningstider", "Book time", "Tjenester"],
     };
   }
@@ -296,35 +305,32 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
     };
   }
 
-  // 11) Human handoff – explicit request
+  // 11) Human handoff
   if (matchAny(m, ["snakk med", "vil ha menneske", "vil snakke med", "ekte person", "ringe", "ring oss", "kontakt dere", "send melding", "la meg snakke"])) {
     return {
-      reply: `Selvfølgelig! Du kan nå oss direkte her:\n\n📞 **Telefon:** ${clinicConfig.contact.phone}\n✉️ **E-post:** ${clinicConfig.contact.email}\n\n${isOpenNow(clinicConfig) ? "✅ Vi har åpent nå – ring oss gjerne!" : "🔒 Vi har stengt akkurat nå, men send en e-post så svarer vi så fort vi kan."}`,
+      reply: `Selvfølgelig! Du kan nå oss direkte her:\n\n📞 **Telefon:** ${config.contact.phone}\n✉️ **E-post:** ${config.contact.email}\n\n${isOpenNow(config) ? "✅ Vi har åpent nå – ring oss gjerne!" : "🔒 Vi har stengt akkurat nå, men send en e-post så svarer vi så fort vi kan."}`,
       suggestions: ["Book time i stedet", "Åpningstider"],
     };
   }
 
-  // 12) Smart fallback – ask ONE follow-up question based on context
+  // 12) Smart fallback
   const lastTopics = history
     .filter(h => h.role === "user")
     .map(h => norm(h.content))
     .join(" ");
 
-  // Count how many times we've already given a generic fallback
   const fallbackCount = history
     .filter(h => h.role === "assistant")
     .filter(h => h.content.includes("Kan du si litt mer") || h.content.includes("Hva gjelder det"))
     .length;
 
-  // After 2 unclear messages, escalate to human
   if (fallbackCount >= 2) {
     return {
-      reply: `Jeg er ikke sikker på om jeg forstår hva du mener, og vil ikke gi deg feil svar. 🙏\n\nDu er velkommen til å ringe eller sende oss en e-post – da hjelper en av oss deg med en gang.\n\n📞 ${clinicConfig.contact.phone}\n✉️ ${clinicConfig.contact.email}`,
+      reply: `Jeg er ikke sikker på om jeg forstår hva du mener, og vil ikke gi deg feil svar. 🙏\n\nDu er velkommen til å ringe eller sende oss en e-post – da hjelper en av oss deg med en gang.\n\n📞 ${config.contact.phone}\n✉️ ${config.contact.email}`,
       suggestions: ["Book time", "Åpningstider", "Priser"],
     };
   }
 
-  // If they've been asking about booking
   if (matchAny(lastTopics, ["book", "time", "bestill", "avtale"])) {
     return {
       reply: "Hvilken behandling gjelder det? Er det tannrens, undersøkelse, eller har du vondt et sted?",
@@ -332,7 +338,6 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
     };
   }
 
-  // If they've been asking about prices
   if (matchAny(lastTopics, ["pris", "kost", "betale"])) {
     return {
       reply: "Hvilken behandling lurer du på prisen for? Jeg finner det med én gang.",
@@ -340,7 +345,6 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
     };
   }
 
-  // If they seem to be describing a problem
   if (matchAny(m, ["tann", "munn", "kjeve", "gom", "leppe", "bite", "tygge"])) {
     return {
       reply: "Det høres ut som du har et spørsmål om tannen din. Kan du beskrive litt mer hva du kjenner – er det smerte, følsomhet, eller noe annet?",
@@ -348,7 +352,6 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
     };
   }
 
-  // Generic fallback – one open question
   return {
     reply: "Hva gjelder det? Jeg hjelper gjerne med time, priser, åpningstider eller symptomer. Eller si \"snakk med oss\" om du vil ringe/sende e-post.",
     suggestions: ["Jeg har tannpine", "Book time", "Se priser", "Snakk med oss"],
@@ -360,12 +363,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const message: string = body?.message ?? "";
     const history: ChatMessage[] = Array.isArray(body?.history) ? body.history : [];
+    const clinicId: string = typeof body?.clinicId === "string" ? body.clinicId : "demo";
 
     if (!message || typeof message !== "string") {
       return NextResponse.json({ error: "Missing 'message'." }, { status: 400 });
     }
 
-    const response = route(message, history);
+    const config = await getClinicData(clinicId);
+    const response = route(message, history, config);
     return NextResponse.json(response);
   } catch (err: any) {
     return NextResponse.json(

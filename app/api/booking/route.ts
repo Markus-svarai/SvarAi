@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clinicConfig, formatNok } from "@/lib/clinic-config";
+import { formatNok } from "@/lib/clinic-config";
+import { getClinicData } from "@/lib/get-clinic-data";
 import { saveBooking, isSupabaseConfigured } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -33,7 +34,12 @@ function formatDate(iso: string): string {
 }
 
 // Sender e-post til klinikken med all booking-info
-async function sendBookingEmail(booking: Booking, servicePriceNok: number): Promise<boolean> {
+async function sendBookingEmail(
+  booking: Booking,
+  servicePriceNok: number,
+  clinicName: string,
+  notifyEmail: string
+): Promise<boolean> {
   if (!RESEND_API_KEY) {
     console.log("[booking] Ingen RESEND_API_KEY – logger booking lokalt:", booking);
     return false;
@@ -48,11 +54,11 @@ async function sendBookingEmail(booking: Booking, servicePriceNok: number): Prom
       },
       body: JSON.stringify({
         from: "SvarAI <hei@svarai.no>",
-        to: [NOTIFY_EMAIL],
+        to: [notifyEmail],
         subject: `📅 Ny booking: ${booking.serviceName} – ${booking.name}`,
         html: `
           <div style="font-family: system-ui, sans-serif; max-width: 520px;">
-            <h2 style="color: #1a1a2e; margin-bottom: 4px;">Ny booking fra ${clinicConfig.name}</h2>
+            <h2 style="color: #1a1a2e; margin-bottom: 4px;">Ny booking fra ${clinicName}</h2>
             <p style="color: #6b7280; margin-top: 0;">En pasient har bestilt time via SvarAI. Ring for å bekrefte.</p>
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
 
@@ -96,62 +102,62 @@ async function sendBookingEmail(booking: Booking, servicePriceNok: number): Prom
   }
 }
 
-function validate(input: any): { ok: true; booking: Omit<Booking, "id" | "createdAt" | "serviceName"> } | { ok: false; error: string } {
-  if (!input) return { ok: false, error: "Mangler data." };
-  const { serviceId, date, time, name, phone, email } = input;
-
-  if (typeof serviceId !== "string" || !clinicConfig.services.find(s => s.id === serviceId)) {
-    return { ok: false, error: "Ugyldig tjeneste." };
-  }
-  if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return { ok: false, error: "Ugyldig dato." };
-  }
-  if (typeof time !== "string" || !/^\d{2}:\d{2}$/.test(time)) {
-    return { ok: false, error: "Ugyldig tidspunkt." };
-  }
-  if (typeof name !== "string" || name.trim().length < 2) {
-    return { ok: false, error: "Vennligst skriv inn fullt navn." };
-  }
-  if (typeof phone !== "string" || phone.replace(/\D/g, "").length < 8) {
-    return { ok: false, error: "Vennligst skriv inn et gyldig telefonnummer." };
-  }
-  if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { ok: false, error: "Vennligst skriv inn en gyldig e-postadresse." };
-  }
-
-  return {
-    ok: true,
-    booking: { serviceId, date, time, name: name.trim(), phone: phone.trim(), email: email.trim() },
-  };
-}
-
 export async function POST(req: NextRequest) {
   try {
     const input = await req.json();
-    const result = validate(input);
+    if (!input) return NextResponse.json({ error: "Mangler data." }, { status: 400 });
 
-    if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+    const clinicId: string = typeof input.clinicId === "string" ? input.clinicId : "demo";
+
+    // Hent klinikk-data dynamisk (fra Supabase eller fallback)
+    const config = await getClinicData(clinicId);
+
+    const { serviceId, date, time, name, phone, email } = input;
+
+    // Validering
+    if (typeof serviceId !== "string" || !config.services.find(s => s.id === serviceId)) {
+      return NextResponse.json({ error: "Ugyldig tjeneste." }, { status: 400 });
+    }
+    if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return NextResponse.json({ error: "Ugyldig dato." }, { status: 400 });
+    }
+    if (typeof time !== "string" || !/^\d{2}:\d{2}$/.test(time)) {
+      return NextResponse.json({ error: "Ugyldig tidspunkt." }, { status: 400 });
+    }
+    if (typeof name !== "string" || name.trim().length < 2) {
+      return NextResponse.json({ error: "Vennligst skriv inn fullt navn." }, { status: 400 });
+    }
+    if (typeof phone !== "string" || phone.replace(/\D/g, "").length < 8) {
+      return NextResponse.json({ error: "Vennligst skriv inn et gyldig telefonnummer." }, { status: 400 });
+    }
+    if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: "Vennligst skriv inn en gyldig e-postadresse." }, { status: 400 });
     }
 
-    const service = clinicConfig.services.find(s => s.id === result.booking.serviceId)!;
+    const service = config.services.find(s => s.id === serviceId)!;
 
     const booking: Booking = {
       id: `SVR-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
-      ...result.booking,
+      serviceId,
       serviceName: service.name,
+      date,
+      time,
+      name: name.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
       createdAt: new Date().toISOString(),
     };
 
     // Lagre i Supabase (hvis konfigurert)
     if (isSupabaseConfigured()) {
-      await saveBooking({ ...booking, clinic_id: "demo" }).catch(err =>
+      await saveBooking({ ...booking, clinic_id: clinicId }).catch(err =>
         console.error("[booking] Supabase save feil:", err)
       );
     }
 
-    // Send e-post til klinikken
-    await sendBookingEmail(booking, service.priceNok);
+    // Send e-post til klinikken (bruk klinikkens e-post fra config, eller fallback til NOTIFY_EMAIL)
+    const notifyEmail = config.contact.email || NOTIFY_EMAIL;
+    await sendBookingEmail(booking, service.priceNok, config.name, notifyEmail);
 
     return NextResponse.json({
       ok: true,

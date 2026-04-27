@@ -120,7 +120,7 @@ export default function WidgetPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, history }),
+        body: JSON.stringify({ message: trimmed, history, clinicId }),
       });
       const data = await res.json();
       addAssistantMessage(data.reply, data.suggestions);
@@ -219,7 +219,7 @@ export default function WidgetPage() {
           const res = await fetch("/api/booking", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(bookingData),
+            body: JSON.stringify({ ...bookingData, clinicId }),
           });
           const data = await res.json();
           if (data.ok) {

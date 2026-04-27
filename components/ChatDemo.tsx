@@ -152,6 +152,7 @@ export default function ChatDemo() {
         body: JSON.stringify({
           message: text,
           history: messages.map(({ role, content }) => ({ role, content })),
+          clinicId: "demo",
         }),
       });
       const data = await res.json();
@@ -199,7 +200,7 @@ export default function ChatDemo() {
       const res = await fetch("/api/booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
+        body: JSON.stringify({ ...draft, clinicId: "demo" }),
       });
       const data = await res.json();
       if (data.ok) {
