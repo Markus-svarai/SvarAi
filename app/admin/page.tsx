@@ -160,10 +160,14 @@ function LoginGate({ onAuth }: { onAuth: (clinicId: string) => void }) {
 
 // ── Tab: Bookinger ─────────────────────────────────────────────────────────
 
+type StatusFilter = "all" | "pending" | "confirmed" | "cancelled";
+
 function BookingsTab({ clinicId }: { clinicId: string }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState<StatusFilter>("pending");
+  const [updating, setUpdating] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch(`/api/admin/bookings?clinicId=${encodeURIComponent(clinicId)}`)
@@ -172,14 +176,39 @@ function BookingsTab({ clinicId }: { clinicId: string }) {
       .finally(() => setLoading(false));
   }, [clinicId]);
 
+  async function updateStatus(id: string, status: string) {
+    setUpdating(id);
+    try {
+      await apiFetch("/api/admin/bookings", {
+        method: "PATCH",
+        body: JSON.stringify({ id, status }),
+      });
+      setBookings(prev => prev.map(b => b.id === id ? { ...b, status } : b));
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setUpdating(null);
+    }
+  }
+
   const statusColor = (s: string) =>
-    s === "confirmed" ? "text-green-700 bg-green-50" :
-    s === "cancelled" ? "text-red-700 bg-red-50" :
-    "text-amber-700 bg-amber-50";
+    s === "confirmed" ? "text-green-700 bg-green-50 border-green-100" :
+    s === "cancelled"  ? "text-red-700 bg-red-50 border-red-100" :
+    "text-amber-700 bg-amber-50 border-amber-100";
 
   const statusLabel = (s: string) =>
     s === "confirmed" ? "Bekreftet" :
-    s === "cancelled" ? "Avlyst" : "Venter";
+    s === "cancelled"  ? "Avlyst" : "Venter";
+
+  const FILTERS: { key: StatusFilter; label: string }[] = [
+    { key: "pending",   label: "Venter" },
+    { key: "confirmed", label: "Bekreftet" },
+    { key: "cancelled", label: "Avlyst" },
+    { key: "all",       label: "Alle" },
+  ];
+
+  const filtered = filter === "all" ? bookings : bookings.filter(b => b.status === filter);
+  const pendingCount = bookings.filter(b => b.status === "pending").length;
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorBox msg={error} />;
@@ -187,34 +216,110 @@ function BookingsTab({ clinicId }: { clinicId: string }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-ink-900">Bookinger</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-ink-900">Bookinger</h2>
+          {pendingCount > 0 && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+              {pendingCount} venter
+            </span>
+          )}
+        </div>
         <span className="text-sm text-ink-500">{bookings.length} totalt</span>
       </div>
-      {bookings.length === 0 ? (
-        <EmptyState text="Ingen bookinger ennå." />
+
+      {/* Statusfilter */}
+      <div className="flex gap-1 mb-4 bg-ink-100 rounded-lg p-1 w-fit">
+        {FILTERS.map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${
+              filter === f.key
+                ? "bg-white text-ink-900 shadow-sm"
+                : "text-ink-500 hover:text-ink-900"
+            }`}
+          >
+            {f.label}
+            {f.key !== "all" && (
+              <span className="ml-1 opacity-60">
+                ({bookings.filter(b => b.status === f.key).length})
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <EmptyState text={filter === "all" ? "Ingen bookinger ennå." : `Ingen ${statusLabel(filter).toLowerCase()} bookinger.`} />
       ) : (
         <div className="space-y-2">
-          {bookings.map(b => (
-            <div key={b.id} className="rounded-xl border border-ink-100 bg-white p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="font-semibold text-sm text-ink-900">{b.name}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(b.status)}`}>
-                      {statusLabel(b.status)}
-                    </span>
+          {filtered.map(b => {
+            const isUpdating = updating === b.id;
+            return (
+              <div key={b.id} className="rounded-xl border border-ink-100 bg-white p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                      <span className="font-semibold text-sm text-ink-900">{b.name}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${statusColor(b.status)}`}>
+                        {statusLabel(b.status)}
+                      </span>
+                    </div>
+                    <div className="text-sm text-ink-700">{b.service_name} · {fmtDate(b.date)} kl. {b.time}</div>
+                    <div className="text-xs text-ink-500 mt-0.5 flex gap-3 flex-wrap">
+                      <a href={`tel:${b.phone}`} className="hover:text-ink-900">{b.phone}</a>
+                      <a href={`mailto:${b.email}`} className="hover:text-ink-900">{b.email}</a>
+                    </div>
                   </div>
-                  <div className="text-sm text-ink-700">{b.service_name} · {fmtDate(b.date)} kl. {b.time}</div>
-                  <div className="text-xs text-ink-500 mt-0.5 flex gap-3">
-                    <a href={`tel:${b.phone}`} className="hover:text-ink-900">{b.phone}</a>
-                    <a href={`mailto:${b.email}`} className="hover:text-ink-900">{b.email}</a>
-                  </div>
+                  <div className="text-xs text-ink-400 whitespace-nowrap shrink-0">{fmtCreated(b.created_at)}</div>
                 </div>
-                <div className="text-xs text-ink-400 whitespace-nowrap">{fmtCreated(b.created_at)}</div>
+
+                {/* Handlingsknapper */}
+                {b.status !== "cancelled" && (
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-ink-100">
+                    {b.status === "pending" && (
+                      <button
+                        onClick={() => updateStatus(b.id, "confirmed")}
+                        disabled={isUpdating}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition"
+                      >
+                        {isUpdating ? "…" : (
+                          <>
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Bekreft
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (confirm(`Avlys booking for ${b.name}?`)) updateStatus(b.id, "cancelled");
+                      }}
+                      disabled={isUpdating}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition"
+                    >
+                      {isUpdating ? "…" : (
+                        <>
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          Avlys
+                        </>
+                      )}
+                    </button>
+                    <div className="ml-auto text-xs text-ink-400 self-center">Ref: {b.id.slice(0, 8)}</div>
+                  </div>
+                )}
+                {b.status === "cancelled" && (
+                  <div className="flex justify-end mt-2">
+                    <div className="text-xs text-ink-400">Ref: {b.id.slice(0, 8)}</div>
+                  </div>
+                )}
               </div>
-              <div className="text-xs text-ink-400 mt-1.5">Ref: {b.id}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
