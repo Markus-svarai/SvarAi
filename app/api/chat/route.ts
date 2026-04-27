@@ -256,16 +256,38 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
   // 10) Identity
   if (matchAny(m, ["hvem er du", "robot", "ai", "bot", "menneske", "ekte"])) {
     return {
-      reply: "Jeg er SvarAI – en digital assistent som hjelper deg 24/7. Jeg kan svare på spørsmål, vurdere symptomer og booke time. Er det noe mer komplisert setter jeg deg i kontakt med klinikken.",
-      suggestions: ["Book time", "Jeg har tannpine", "Åpningstider"],
+      reply: "Jeg er SvarAI – en digital assistent som hjelper deg 24/7. Jeg kan svare på spørsmål, vurdere symptomer og booke time.\n\nFor kompliserte saker setter jeg deg direkte i kontakt med klinikken.",
+      suggestions: ["Book time", "Jeg har tannpine", "Snakk med oss"],
     };
   }
 
-  // 11) Smart fallback – ask ONE follow-up question based on context
+  // 11) Human handoff – explicit request
+  if (matchAny(m, ["snakk med", "vil ha menneske", "vil snakke med", "ekte person", "ringe", "ring oss", "kontakt dere", "send melding", "la meg snakke"])) {
+    return {
+      reply: `Selvfølgelig! Du kan nå oss direkte her:\n\n📞 **Telefon:** ${clinicConfig.contact.phone}\n✉️ **E-post:** ${clinicConfig.contact.email}\n\n${isOpenNow(clinicConfig) ? "✅ Vi har åpent nå – ring oss gjerne!" : "🔒 Vi har stengt akkurat nå, men send en e-post så svarer vi så fort vi kan."}`,
+      suggestions: ["Book time i stedet", "Åpningstider"],
+    };
+  }
+
+  // 12) Smart fallback – ask ONE follow-up question based on context
   const lastTopics = history
     .filter(h => h.role === "user")
     .map(h => norm(h.content))
     .join(" ");
+
+  // Count how many times we've already given a generic fallback
+  const fallbackCount = history
+    .filter(h => h.role === "assistant")
+    .filter(h => h.content.includes("Kan du si litt mer") || h.content.includes("Hva gjelder det"))
+    .length;
+
+  // After 2 unclear messages, escalate to human
+  if (fallbackCount >= 2) {
+    return {
+      reply: `Jeg er ikke sikker på om jeg forstår hva du mener, og vil ikke gi deg feil svar. 🙏\n\nDu er velkommen til å ringe eller sende oss en e-post – da hjelper en av oss deg med en gang.\n\n📞 ${clinicConfig.contact.phone}\n✉️ ${clinicConfig.contact.email}`,
+      suggestions: ["Book time", "Åpningstider", "Priser"],
+    };
+  }
 
   // If they've been asking about booking
   if (matchAny(lastTopics, ["book", "time", "bestill", "avtale"])) {
@@ -291,10 +313,10 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
     };
   }
 
-  // Generic fallback – one open question, never repeating
+  // Generic fallback – one open question
   return {
-    reply: "Jeg vil gjerne hjelpe deg! Kan du si litt mer om hva det gjelder? Er det en time du vil bestille, noe som gjør vondt, eller lurer du på priser?",
-    suggestions: ["Jeg har tannpine", "Book time", "Se priser", "Åpningstider"],
+    reply: "Hva gjelder det? Jeg hjelper gjerne med time, priser, åpningstider eller symptomer. Eller si \"snakk med oss\" om du vil ringe/sende e-post.",
+    suggestions: ["Jeg har tannpine", "Book time", "Se priser", "Snakk med oss"],
   };
 }
 
