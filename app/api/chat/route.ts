@@ -167,15 +167,37 @@ function matchSymptom(m: string, config: ClinicConfig): SymptomMatch | null {
   return null;
 }
 
-// --- Intent routing ---
+// --- Availability helper ---
 
-const TODAY_TIMES = ["09:00", "10:30", "13:00", "14:30", "15:30"];
+async function getAvailableSlots(
+  clinicId: string,
+  serviceId: string,
+  date: string
+): Promise<string[]> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "https://svarai.no";
+    const res = await fetch(
+      `${baseUrl}/api/availability?clinicId=${encodeURIComponent(clinicId)}&serviceId=${encodeURIComponent(serviceId)}&date=${encodeURIComponent(date)}`
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.slots ?? []).slice(0, 5).map((s: { time: string }) => s.time);
+  } catch {
+    return ["09:00", "10:30", "13:00", "14:30"];
+  }
+}
+
+function todayStr(): string {
+  return new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD
+}
+
+// --- Intent routing ---
 
 function isUrgent(m: string): boolean {
   return matchAny(m, ["i dag", "nå", "asap", "snarest", "så fort", "med en gang", "akutt", "umiddelbart", "første ledige", "første mulige", "så snart"]);
 }
 
-function route(message: string, history: ChatMessage[], config: ClinicConfig): ChatResponse {
+async function route(message: string, history: ChatMessage[], config: ClinicConfig, clinicId: string): Promise<ChatResponse> {
   const m = norm(message);
   const urgent = isUrgent(m);
 
@@ -183,11 +205,18 @@ function route(message: string, history: ChatMessage[], config: ClinicConfig): C
   const symptom = matchSymptom(m, config);
   if (symptom) {
     if (urgent || symptom.urgency === "akutt") {
-      const times = TODAY_TIMES.slice(0, 4);
+      const times = await getAvailableSlots(clinicId, symptom.serviceId, todayStr());
+      if (times.length > 0) {
+        return {
+          reply: `Det høres vondt ut — vi tar det på alvor.\n\n**Ledige tider i dag:**\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken tid passer?`,
+          action: { type: "start_booking", serviceId: symptom.serviceId },
+          suggestions: times,
+        };
+      }
       return {
-        reply: `Det høres vondt ut — vi tar det på alvor.\n\n**Vi har disse tidene ledig i dag:**\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken tid passer?`,
+        reply: `Det høres vondt ut — vi tar det på alvor.\n\nDessverre har vi ingen ledige tider i dag. Vi anbefaler å ringe oss direkte på ${config.contact.phone} for akutthjelp.`,
         action: { type: "start_booking", serviceId: symptom.serviceId },
-        suggestions: times,
+        suggestions: ["Ring oss", "Se tider i morgen"],
       };
     }
     return {
@@ -202,18 +231,27 @@ function route(message: string, history: ChatMessage[], config: ClinicConfig): C
     matchAny(m, ["book", "bestille", "bestill", "reservere", "sette opp", "time", "avtale", "ledig time", "ny time"]) &&
     !matchAny(m, ["avbest", "avlys", "kansell", "flytte", "endre"])
   ) {
-    if (urgent) {
-      const times = TODAY_TIMES.slice(0, 4);
-      return {
-        reply: `Vi har disse tidene ledig i dag:\n\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
-        action: { type: "start_booking", serviceId: "undersokelse" },
-        suggestions: times,
-      };
-    }
-
     const matchedService = config.services.find(s =>
       m.includes(norm(s.name)) || m.includes(s.id)
     );
+
+    if (urgent) {
+      const serviceId = matchedService?.id ?? (config.services[0]?.id ?? "");
+      const times = await getAvailableSlots(clinicId, serviceId, todayStr());
+      if (times.length > 0) {
+        return {
+          reply: `Ledige tider i dag:\n\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
+          action: { type: "start_booking", serviceId },
+          suggestions: times,
+        };
+      }
+      return {
+        reply: `Ingen ledige tider i dag dessverre. Ring oss på ${config.contact.phone} for å finne noe som passer.`,
+        action: { type: "start_booking", serviceId },
+        suggestions: ["Ring oss", "Se andre datoer"],
+      };
+    }
+
     return {
       reply: matchedService
         ? `Jeg hjelper deg med **${matchedService.name}** (${formatNok(matchedService.priceNok)}, ${matchedService.durationMinutes} min). La oss finne en tid.`
@@ -225,11 +263,18 @@ function route(message: string, history: ChatMessage[], config: ClinicConfig): C
 
   // 2b) "Første ledige"
   if (matchAny(m, ["første ledige", "første mulige", "når er dere ledig", "når har dere ledig"])) {
-    const times = TODAY_TIMES.slice(0, 4);
+    const serviceId = config.services[0]?.id ?? "";
+    const times = await getAvailableSlots(clinicId, serviceId, todayStr());
+    if (times.length > 0) {
+      return {
+        reply: `Første ledige tider i dag:\n\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
+        action: { type: "start_booking", serviceId },
+        suggestions: times,
+      };
+    }
     return {
-      reply: `Første ledige tider i dag:\n\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
-      action: { type: "start_booking", serviceId: "undersokelse" },
-      suggestions: times,
+      reply: `Ingen ledige tider i dag. Ring oss på ${config.contact.phone} så finner vi noe som passer.`,
+      suggestions: ["Ring oss", "Se åpningstider"],
     };
   }
 
@@ -370,7 +415,7 @@ export async function POST(req: NextRequest) {
     }
 
     const config = await getClinicData(clinicId);
-    const response = route(message, history, config);
+    const response = await route(message, history, config, clinicId);
     return NextResponse.json(response);
   } catch (err: any) {
     return NextResponse.json(

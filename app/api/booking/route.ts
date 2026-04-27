@@ -19,6 +19,8 @@ type Booking = {
   name: string;
   phone: string;
   email: string;
+  staffId?: string;
+  staffName?: string;
   createdAt: string;
 };
 
@@ -112,7 +114,7 @@ export async function POST(req: NextRequest) {
     // Hent klinikk-data dynamisk (fra Supabase eller fallback)
     const config = await getClinicData(clinicId);
 
-    const { serviceId, date, time, name, phone, email } = input;
+    const { serviceId, date, time, name, phone, email, staffId, staffName } = input;
 
     // Validering
     if (typeof serviceId !== "string" || !config.services.find(s => s.id === serviceId)) {
@@ -145,14 +147,19 @@ export async function POST(req: NextRequest) {
       name: name.trim(),
       phone: phone.trim(),
       email: email.trim(),
+      staffId: staffId ?? undefined,
+      staffName: staffName ?? undefined,
       createdAt: new Date().toISOString(),
     };
 
     // Lagre i Supabase (hvis konfigurert)
     if (isSupabaseConfigured()) {
-      await saveBooking({ ...booking, clinic_id: clinicId }).catch(err =>
-        console.error("[booking] Supabase save feil:", err)
-      );
+      await saveBooking({
+        ...booking,
+        clinic_id: clinicId,
+        staff_id: staffId ?? null,
+        staff_name: staffName ?? null,
+      }).catch(err => console.error("[booking] Supabase save feil:", err));
     }
 
     // Send e-post til klinikken (bruk klinikkens e-post fra config, eller fallback til NOTIFY_EMAIL)

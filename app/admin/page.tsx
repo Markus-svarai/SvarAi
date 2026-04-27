@@ -47,7 +47,16 @@ type Booking = {
   phone: string;
   email: string;
   status: string;
+  staff_name?: string;
   created_at: string;
+};
+
+type StaffMember = {
+  id: string;
+  clinic_id: string;
+  name: string;
+  title: string | null;
+  active: boolean;
 };
 
 const DAYS = ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"];
@@ -265,7 +274,10 @@ function BookingsTab({ clinicId }: { clinicId: string }) {
                         {statusLabel(b.status)}
                       </span>
                     </div>
-                    <div className="text-sm text-ink-700">{b.service_name} · {fmtDate(b.date)} kl. {b.time}</div>
+                    <div className="text-sm text-ink-700">
+                    {b.service_name} · {fmtDate(b.date)} kl. {b.time}
+                    {b.staff_name && <span className="text-ink-400"> · {b.staff_name}</span>}
+                  </div>
                     <div className="text-xs text-ink-500 mt-0.5 flex gap-3 flex-wrap">
                       <a href={`tel:${b.phone}`} className="hover:text-ink-900">{b.phone}</a>
                       <a href={`mailto:${b.email}`} className="hover:text-ink-900">{b.email}</a>
@@ -320,6 +332,175 @@ function BookingsTab({ clinicId }: { clinicId: string }) {
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tab: Ansatte ───────────────────────────────────────────────────────────
+
+function StaffTab({ clinicId }: { clinicId: string }) {
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<StaffMember | null>(null);
+  const [form, setForm] = useState({ name: "", title: "" });
+
+  useEffect(() => {
+    apiFetch(`/api/admin/staff?clinicId=${encodeURIComponent(clinicId)}`)
+      .then(data => setStaff(data ?? []))
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [clinicId]);
+
+  function openNew() {
+    setEditing(null);
+    setForm({ name: "", title: "" });
+    setShowForm(true);
+  }
+
+  function openEdit(s: StaffMember) {
+    setEditing(s);
+    setForm({ name: s.name, title: s.title ?? "" });
+    setShowForm(true);
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const body = editing
+        ? { id: editing.id, clinic_id: clinicId, ...form }
+        : { clinic_id: clinicId, ...form };
+      const result = await apiFetch("/api/admin/staff", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      if (editing) {
+        setStaff(prev => prev.map(s => s.id === editing.id ? { ...s, ...form } : s));
+      } else {
+        setStaff(prev => [...prev, result]);
+      }
+      setShowForm(false);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleActive(s: StaffMember) {
+    try {
+      await apiFetch("/api/admin/staff", {
+        method: "POST",
+        body: JSON.stringify({ id: s.id, clinic_id: clinicId, name: s.name, title: s.title, active: !s.active }),
+      });
+      setStaff(prev => prev.map(m => m.id === s.id ? { ...m, active: !m.active } : m));
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Slett denne ansatte? Eksisterende bookinger beholdes.")) return;
+    try {
+      await apiFetch(`/api/admin/staff?id=${id}`, { method: "DELETE" });
+      setStaff(prev => prev.filter(s => s.id !== id));
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
+
+  if (loading) return <LoadingSpinner />;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-ink-900">Ansatte</h2>
+          <p className="text-xs text-ink-500 mt-0.5">Bookinger fordeles automatisk basert på hvem som er ledig.</p>
+        </div>
+        <button
+          onClick={openNew}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-ink-900 text-white text-sm font-medium px-3 py-2 hover:bg-ink-800 transition"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Legg til
+        </button>
+      </div>
+
+      {error && <ErrorBox msg={error} />}
+
+      {showForm && (
+        <form onSubmit={save} className="mb-4 rounded-xl border border-brand-200 bg-brand-50/40 p-4 space-y-3">
+          <p className="text-sm font-semibold text-ink-900">{editing ? "Rediger ansatt" : "Ny ansatt"}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-xs font-medium text-ink-700">Navn *</span>
+              <input
+                required
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="f.eks. Dr. Hansen"
+                className="mt-1 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-ink-700">Tittel</span>
+              <input
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="f.eks. Tannlege"
+                className="mt-1 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              />
+            </label>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button type="submit" disabled={saving} className="rounded-lg bg-ink-900 text-white text-sm font-medium px-4 py-2 hover:bg-ink-800 disabled:opacity-60">
+              {saving ? "Lagrer…" : "Lagre"}
+            </button>
+            <button type="button" onClick={() => setShowForm(false)} className="text-sm text-ink-500 hover:text-ink-900 px-2">Avbryt</button>
+          </div>
+        </form>
+      )}
+
+      {staff.length === 0 ? (
+        <EmptyState text="Ingen ansatte lagt til ennå. Legg til for å aktivere automatisk booking." />
+      ) : (
+        <div className="space-y-2">
+          {staff.map(s => (
+            <div key={s.id} className={`rounded-xl border bg-white p-4 flex items-center justify-between gap-4 ${s.active ? "border-ink-100" : "border-ink-100 opacity-60"}`}>
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-full bg-ink-100 flex items-center justify-center text-sm font-semibold text-ink-700">
+                  {s.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-ink-900">{s.name}</div>
+                  {s.title && <div className="text-xs text-ink-500">{s.title}</div>}
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.active ? "bg-green-50 text-green-700" : "bg-ink-100 text-ink-500"}`}>
+                  {s.active ? "Aktiv" : "Inaktiv"}
+                </span>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => openEdit(s)} className="text-xs text-ink-600 hover:text-ink-900 border border-ink-200 rounded-lg px-2.5 py-1.5 hover:bg-ink-50 transition">
+                  Rediger
+                </button>
+                <button onClick={() => toggleActive(s)} className="text-xs text-ink-600 hover:text-ink-900 border border-ink-200 rounded-lg px-2.5 py-1.5 hover:bg-ink-50 transition">
+                  {s.active ? "Deaktiver" : "Aktiver"}
+                </button>
+                <button onClick={() => remove(s.id)} className="text-xs text-red-600 hover:text-red-800 border border-red-100 rounded-lg px-2.5 py-1.5 hover:bg-red-50 transition">
+                  Slett
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -724,6 +905,7 @@ function EmptyState({ text }: { text: string }) {
 
 const TABS = [
   { id: "bookings",  label: "Bookinger" },
+  { id: "staff",     label: "Ansatte" },
   { id: "services",  label: "Tjenester" },
   { id: "hours",     label: "Åpningstider" },
   { id: "clinic",    label: "Klinikk-info" },
@@ -776,6 +958,7 @@ export default function AdminPage() {
       {/* Content */}
       <main className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
         {tab === "bookings"  && <BookingsTab clinicId={clinicId} />}
+        {tab === "staff"     && <StaffTab    clinicId={clinicId} />}
         {tab === "services"  && <ServicesTab clinicId={clinicId} />}
         {tab === "hours"     && <HoursTab    clinicId={clinicId} />}
         {tab === "clinic"    && <ClinicTab   clinicId={clinicId} />}
