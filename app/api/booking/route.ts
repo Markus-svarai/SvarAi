@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clinicConfig, formatNok } from "@/lib/clinic-config";
+import { saveBooking, isSupabaseConfigured } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
@@ -141,6 +142,13 @@ export async function POST(req: NextRequest) {
       serviceName: service.name,
       createdAt: new Date().toISOString(),
     };
+
+    // Lagre i Supabase (hvis konfigurert)
+    if (isSupabaseConfigured()) {
+      await saveBooking({ ...booking, clinic_id: "demo" }).catch(err =>
+        console.error("[booking] Supabase save feil:", err)
+      );
+    }
 
     // Send e-post til klinikken
     await sendBookingEmail(booking, service.priceNok);
