@@ -1073,16 +1073,17 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
                               ? "bg-ink-900 text-white rounded-br-sm"
                               : "bg-white border border-ink-100 text-ink-700 rounded-bl-sm"
                           }`}>
-                          {m.content}
+                            {m.content}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
     </div>
   );
