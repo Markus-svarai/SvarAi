@@ -62,6 +62,7 @@ export default function WidgetPage() {
   const brandColor = "#" + (params.get("color") ?? "6c63ff");
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     // Check if this clinic has an active subscription
     fetch(`/api/widget-check?id=${encodeURIComponent(clinicId)}`)
@@ -84,6 +85,7 @@ export default function WidgetPage() {
       });
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
