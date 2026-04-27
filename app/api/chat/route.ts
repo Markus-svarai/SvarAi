@@ -193,15 +193,78 @@ function todayStr(): string {
   return new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD
 }
 
+function tomorrowStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toLocaleDateString("sv-SE");
+}
+
+function tomorrowLabel(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toLocaleDateString("nb-NO", { weekday: "long" });
+}
+
 // --- Intent routing ---
 
 function isUrgent(m: string): boolean {
   return matchAny(m, ["i dag", "nå", "asap", "snarest", "så fort", "med en gang", "akutt", "umiddelbart", "første ledige", "første mulige", "så snart"]);
 }
 
+function isFearful(m: string): boolean {
+  return matchAny(m, ["redd", "nervøs", "angst", "tannlegeskrekk", "tør ikke", "skummelt", "skummel", "vondt å fikse", "gjør det vondt", "gjør vondt", "smerte under", "smerte av behandling", "frykt", "panikk"]);
+}
+
+function asksAboutExtraction(m: string): boolean {
+  return matchAny(m, ["trekke tann", "trekkes", "dra ut", "fjerne tann", "må trekke", "trenge trekk", "ta ut tann"]);
+}
+
 async function route(message: string, history: ChatMessage[], config: ClinicConfig, clinicId: string): Promise<ChatResponse> {
   const m = norm(message);
   const urgent = isUrgent(m);
+
+  // 0) Tannekstraksjon-spørsmål — svar på spørsmålet FØRST
+  if (asksAboutExtraction(m)) {
+    const akuttPris = getServicePrice(config, "akutt", 890);
+    const times = await getAvailableSlots(clinicId, "akutt", todayStr());
+    const tomorrow = tomorrowStr();
+    const tomorrowTimes = times.length === 0 ? await getAvailableSlots(clinicId, "akutt", tomorrow) : [];
+    const hasTimes = times.length > 0;
+    const hasTomorrowTimes = tomorrowTimes.length > 0;
+
+    const timesBlock = hasTimes
+      ? `\n\n**Ledige tider i dag:**\n${times.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}`
+      : hasTomorrowTimes
+      ? `\n\n**Ledige tider ${tomorrowLabel()}:**\n${tomorrowTimes.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}`
+      : `\n\nVi anbefaler å ringe oss på ${config.contact.phone} så finner vi noe som passer.`;
+
+    return {
+      reply: `Nei, det er ikke sikkert du må trekke tannen 🙏 Veldig ofte kan vi redde den med **fylling** eller **rotfylling** — det avhenger av tilstanden, og det finner vi ut raskt med en undersøkelse.\n\nVi skjønner at det er ubehagelig. La oss ta en titt og gi deg svaret — det er viktig å handle raskt så vi har flest mulig alternativer.\n\n🦷 **Akuttkonsultasjon** (${formatNok(akuttPris)}, 30 min)${timesBlock}\n\nHvilken tid passer?`,
+      action: { type: "start_booking", serviceId: "akutt" },
+      suggestions: hasTimes ? times.slice(0, 3) : hasTomorrowTimes ? tomorrowTimes.slice(0, 3) : ["Ring oss"],
+    };
+  }
+
+  // 0b) Frykt og angst — ro ned, svar på om det gjør vondt
+  if (isFearful(m)) {
+    const times = await getAvailableSlots(clinicId, "akutt", todayStr());
+    const tomorrow = tomorrowStr();
+    const tomorrowTimes = times.length === 0 ? await getAvailableSlots(clinicId, "akutt", tomorrow) : [];
+    const hasTimes = times.length > 0;
+    const hasTomorrowTimes = tomorrowTimes.length > 0;
+
+    const timesBlock = hasTimes
+      ? `\n\n**Ledige tider i dag:**\n${times.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}`
+      : hasTomorrowTimes
+      ? `\n\n**Ledige tider ${tomorrowLabel()}:**\n${tomorrowTimes.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}`
+      : "";
+
+    return {
+      reply: `Det er helt forståelig at du er nervøs — tannlegeskrekk er veldig vanlig 😊\n\nSelve behandlingen gjør **ikke vondt**. Vi bruker lokalbedøvelse som gjør området helt numment før vi starter. Du vil kanskje kjenne litt trykk, men ikke smerte. Og hvis du kjenner noe som helst — si ifra, så stopper vi.\n\nDe fleste som er redde sier etterpå at det gikk mye bedre enn de trodde. Vi tar godt vare på deg 🙏${timesBlock}\n\nVil du booke en time?`,
+      action: { type: "start_booking", serviceId: "akutt" },
+      suggestions: hasTimes ? [...times.slice(0, 2), "Mer info"] : hasTomorrowTimes ? [...tomorrowTimes.slice(0, 2), "Ring oss"] : ["Ring oss", "Mer info", "Åpningstider"],
+    };
+  }
 
   // 1) Symptom check
   const symptom = matchSymptom(m, config);
@@ -210,15 +273,24 @@ async function route(message: string, history: ChatMessage[], config: ClinicConf
       const times = await getAvailableSlots(clinicId, symptom.serviceId, todayStr());
       if (times.length > 0) {
         return {
-          reply: `Det høres vondt ut — vi tar det på alvor.\n\n**Ledige tider i dag:**\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken tid passer?`,
+          reply: `${symptom.reply}\n\n**Ledige tider i dag:**\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken tid passer?`,
           action: { type: "start_booking", serviceId: symptom.serviceId },
           suggestions: times,
         };
       }
+      // Ingen tider i dag — sjekk i morgen automatisk
+      const tomorrowTimes = await getAvailableSlots(clinicId, symptom.serviceId, tomorrowStr());
+      if (tomorrowTimes.length > 0) {
+        return {
+          reply: `${symptom.reply}\n\nVi har dessverre ikke ledig i dag, men **${tomorrowLabel()}** har vi disse tidene:\n${tomorrowTimes.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
+          action: { type: "start_booking", serviceId: symptom.serviceId },
+          suggestions: tomorrowTimes.slice(0, 3),
+        };
+      }
       return {
-        reply: `Det høres vondt ut — vi tar det på alvor.\n\nDessverre har vi ingen ledige tider i dag. Vi anbefaler å ringe oss direkte på ${config.contact.phone} for akutthjelp.`,
+        reply: `${symptom.reply}\n\nVi har dessverre ikke ledig de nærmeste dagene. Ring oss direkte på ${config.contact.phone} — så prøver vi å klemme deg inn så fort som mulig.`,
         action: { type: "start_booking", serviceId: symptom.serviceId },
-        suggestions: ["Ring oss", "Se tider i morgen"],
+        suggestions: ["Ring oss", "Send e-post"],
       };
     }
     return {
@@ -247,10 +319,18 @@ async function route(message: string, history: ChatMessage[], config: ClinicConf
           suggestions: times,
         };
       }
+      const tomorrowTimes = await getAvailableSlots(clinicId, serviceId, tomorrowStr());
+      if (tomorrowTimes.length > 0) {
+        return {
+          reply: `Ingen ledige tider i dag dessverre 😔\n\nMen **${tomorrowLabel()}** har vi disse tidene:\n${tomorrowTimes.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
+          action: { type: "start_booking", serviceId },
+          suggestions: tomorrowTimes.slice(0, 3),
+        };
+      }
       return {
-        reply: `Ingen ledige tider i dag dessverre. Ring oss på ${config.contact.phone} for å finne noe som passer.`,
+        reply: `Ingen ledige tider de nærmeste dagene. Ring oss på ${config.contact.phone} så finner vi noe som passer.`,
         action: { type: "start_booking", serviceId },
-        suggestions: ["Ring oss", "Se andre datoer"],
+        suggestions: ["Ring oss", "Send e-post"],
       };
     }
 
