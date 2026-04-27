@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ScrollToTop from "@/components/ScrollToTop";
 
 export const metadata: Metadata = {
   title: "SvarAI – AI-resepsjonist for klinikker",
@@ -35,6 +36,7 @@ export default function RootLayout({
   return (
     <html lang="no">
       <body className="antialiased bg-white text-ink-900">
+        <ScrollToTop />
         {children}
       </body>
     </html>
