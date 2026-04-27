@@ -439,14 +439,24 @@ export default function ChatDemo() {
       <div className="rounded-2xl border border-ink-100 bg-white shadow-card overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-ink-100 bg-white relative overflow-hidden">
-          <div style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage: "repeating-linear-gradient(-45deg, transparent, transparent 6px, rgba(0,0,0,0.04) 6px, rgba(0,0,0,0.04) 8px)",
-            WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)",
-            maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)",
-            pointerEvents: "none",
-          }} />
+          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} preserveAspectRatio="none" viewBox="0 0 400 56">
+            {[
+              { y: 10, opacity: 0.18, amp: 3 },
+              { y: 20, opacity: 0.13, amp: 4 },
+              { y: 30, opacity: 0.09, amp: 3 },
+              { y: 40, opacity: 0.05, amp: 2 },
+              { y: 50, opacity: 0.02, amp: 1.5 },
+            ].map((w, i) => (
+              <path
+                key={i}
+                d={`M0,${w.y} C50,${w.y - w.amp} 100,${w.y + w.amp} 150,${w.y} S250,${w.y - w.amp} 300,${w.y} S350,${w.y + w.amp} 400,${w.y}`}
+                fill="none"
+                stroke="#000"
+                strokeWidth="1"
+                opacity={w.opacity}
+              />
+            ))}
+          </svg>
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="h-9 w-9 rounded-full bg-brand-500 text-white flex items-center justify-center font-semibold shadow-soft">
