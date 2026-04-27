@@ -61,6 +61,13 @@ export default function WidgetPage() {
   const clinicId = params.get("id") ?? "demo";
   const brandColor = "#" + (params.get("color") ?? "6c63ff");
 
+  // Unik sesjons-ID per chat-økt
+  const sessionId = useRef<string>(
+    typeof crypto !== "undefined"
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2)
+  );
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -120,7 +127,7 @@ export default function WidgetPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, history, clinicId }),
+        body: JSON.stringify({ message: trimmed, history, clinicId, sessionId: sessionId.current }),
       });
       const data = await res.json();
       addAssistantMessage(data.reply, data.suggestions);

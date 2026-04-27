@@ -890,6 +890,136 @@ function ClinicTab({ clinicId }: { clinicId: string }) {
   );
 }
 
+// ── Tab: Samtaler ──────────────────────────────────────────────────────────
+
+type Conversation = {
+  id: string;
+  session_id: string;
+  messages: { role: string; content: string }[];
+  ended_in_booking: boolean;
+  has_unanswered: boolean;
+  created_at: string;
+};
+
+function ConversationsTab({ clinicId }: { clinicId: string }) {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "unanswered" | "booked">("all");
+
+  useEffect(() => {
+    apiFetch(`/api/admin/conversations?clinicId=${encodeURIComponent(clinicId)}`)
+      .then(data => setConversations(data ?? []))
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [clinicId]);
+
+  const filtered = conversations.filter(c => {
+    if (filter === "unanswered") return c.has_unanswered;
+    if (filter === "booked") return c.ended_in_booking;
+    return true;
+  });
+
+  const unansweredCount = conversations.filter(c => c.has_unanswered).length;
+
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorBox msg={error} />;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-ink-900">Samtaler</h2>
+          {unansweredCount > 0 && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+              {unansweredCount} ubesvart
+            </span>
+          )}
+        </div>
+        <span className="text-sm text-ink-500">{conversations.length} totalt</span>
+      </div>
+
+      {/* Filter */}
+      <div className="flex gap-1 mb-4 bg-ink-100 rounded-lg p-1 w-fit">
+        {([
+          { key: "all",         label: "Alle" },
+          { key: "unanswered",  label: "Ubesvart" },
+          { key: "booked",      label: "Endte i booking" },
+        ] as const).map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${
+              filter === f.key
+                ? "bg-white text-ink-900 shadow-sm"
+                : "text-ink-500 hover:text-ink-900"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <EmptyState text={filter === "all" ? "Ingen samtaler ennå. Så snart pasienter chatter, dukker de opp her." : "Ingen samtaler i denne kategorien."} />
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(c => {
+            const userMessages = c.messages.filter(m => m.role === "user");
+            const firstMsg = userMessages[0]?.content ?? "—";
+            const isOpen = expanded === c.id;
+            return (
+              <div key={c.id} className="rounded-xl border border-ink-100 bg-white overflow-hidden">
+                <button
+                  onClick={() => setExpanded(isOpen ? null : c.id)}
+                  className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-ink-50 transition"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      {c.has_unanswered && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100 font-medium">Ubesvart</span>
+                      )}
+                      {c.ended_in_booking && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100 font-medium">Booking</span>
+                      )}
+                      <span className="text-xs text-ink-400">{fmtCreated(c.created_at)}</span>
+                      <span className="text-xs text-ink-400">· {c.messages.length} meldinger</span>
+                    </div>
+                    <p className="text-sm text-ink-700 truncate">{firstMsg}</p>
+                  </div>
+                  <svg
+                    className={`h-4 w-4 text-ink-400 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {isOpen && (
+                  <div className="border-t border-ink-100 px-4 py-3 space-y-2 bg-ink-50/40 max-h-80 overflow-y-auto">
+                    {c.messages.map((m, i) => (
+                      <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-xs rounded-xl px-3 py-2 text-xs ${
+                          m.role === "user"
+                            ? "bg-ink-900 text-white rounded-br-sm"
+                            : "bg-white border border-ink-100 text-ink-700 rounded-bl-sm"
+                        }`}>
+                          {m.content}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Shared UI ──────────────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -972,11 +1102,12 @@ function SubscriptionBadge({ clinicId }: { clinicId: string }) {
 // ── Main ───────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: "bookings",  label: "Bookinger" },
-  { id: "staff",     label: "Ansatte" },
-  { id: "services",  label: "Tjenester" },
-  { id: "hours",     label: "Åpningstider" },
-  { id: "clinic",    label: "Klinikk-info" },
+  { id: "bookings",       label: "Bookinger" },
+  { id: "conversations",  label: "Samtaler" },
+  { id: "staff",          label: "Ansatte" },
+  { id: "services",       label: "Tjenester" },
+  { id: "hours",          label: "Åpningstider" },
+  { id: "clinic",         label: "Klinikk-info" },
 ];
 
 export default function AdminPage() {
@@ -1028,11 +1159,12 @@ export default function AdminPage() {
 
       {/* Content */}
       <main className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
-        {tab === "bookings"  && <BookingsTab clinicId={clinicId} />}
-        {tab === "staff"     && <StaffTab    clinicId={clinicId} />}
-        {tab === "services"  && <ServicesTab clinicId={clinicId} />}
-        {tab === "hours"     && <HoursTab    clinicId={clinicId} />}
-        {tab === "clinic"    && <ClinicTab   clinicId={clinicId} />}
+        {tab === "bookings"      && <BookingsTab       clinicId={clinicId} />}
+        {tab === "conversations" && <ConversationsTab  clinicId={clinicId} />}
+        {tab === "staff"         && <StaffTab          clinicId={clinicId} />}
+        {tab === "services"      && <ServicesTab       clinicId={clinicId} />}
+        {tab === "hours"         && <HoursTab          clinicId={clinicId} />}
+        {tab === "clinic"        && <ClinicTab         clinicId={clinicId} />}
       </main>
     </div>
   );

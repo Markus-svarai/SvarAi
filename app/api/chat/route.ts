@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ClinicConfig, formatNok, isOpenNow } from "@/lib/clinic-config";
 import { getClinicData } from "@/lib/get-clinic-data";
+import { upsertConversation, isSupabaseConfigured } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
@@ -14,6 +15,7 @@ type ChatResponse = {
   reply: string;
   action?: ChatAction;
   suggestions?: string[];
+  unanswered?: boolean;
 };
 
 function norm(s: string) {
@@ -400,6 +402,7 @@ async function route(message: string, history: ChatMessage[], config: ClinicConf
   return {
     reply: "Hva gjelder det? Jeg hjelper gjerne med time, priser, åpningstider eller symptomer. Eller si \"snakk med oss\" om du vil ringe/sende e-post.",
     suggestions: ["Jeg har tannpine", "Book time", "Se priser", "Snakk med oss"],
+    unanswered: true,
   };
 }
 
@@ -409,6 +412,7 @@ export async function POST(req: NextRequest) {
     const message: string = body?.message ?? "";
     const history: ChatMessage[] = Array.isArray(body?.history) ? body.history : [];
     const clinicId: string = typeof body?.clinicId === "string" ? body.clinicId : "demo";
+    const sessionId: string = typeof body?.sessionId === "string" ? body.sessionId : "";
 
     if (!message || typeof message !== "string") {
       return NextResponse.json({ error: "Missing 'message'." }, { status: 400 });
@@ -416,6 +420,22 @@ export async function POST(req: NextRequest) {
 
     const config = await getClinicData(clinicId);
     const response = await route(message, history, config, clinicId);
+
+    // Lagre samtale i Supabase (asynkront, blokkerer ikke svaret)
+    if (sessionId && isSupabaseConfigured()) {
+      const updatedMessages = [
+        ...history,
+        { role: "user", content: message },
+        { role: "assistant", content: response.reply },
+      ];
+      upsertConversation({
+        clinic_id: clinicId,
+        session_id: sessionId,
+        messages: updatedMessages,
+        has_unanswered: response.unanswered === true,
+      }).catch(() => {}); // stille feil — logging skal ikke krasje chat
+    }
+
     return NextResponse.json(response);
   } catch (err: any) {
     return NextResponse.json(

@@ -103,3 +103,25 @@ export async function getBookings(clinicId: string, limit = 50) {
     `/bookings?clinic_id=eq.${encodeURIComponent(clinicId)}&order=created_at.desc&limit=${limit}`
   );
 }
+
+// ── Samtaler ───────────────────────────────────────────────────────────────
+
+export async function upsertConversation(data: {
+  clinic_id: string;
+  session_id: string;
+  messages: { role: string; content: string }[];
+  ended_in_booking?: boolean;
+  has_unanswered?: boolean;
+}) {
+  return supabaseFetch(`/conversations`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify({ ...data, updated_at: new Date().toISOString() }),
+  });
+}
+
+export async function getConversations(clinicId: string, limit = 50) {
+  return supabaseFetch(
+    `/conversations?clinic_id=eq.${encodeURIComponent(clinicId)}&order=created_at.desc&limit=${limit}`
+  );
+}
