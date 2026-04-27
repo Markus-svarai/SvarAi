@@ -901,12 +901,35 @@ type Conversation = {
   created_at: string;
 };
 
+// Hjelp: finn ubesvarte spørsmål fra samtaler
+function extractUnansweredQuestions(conversations: Conversation[]): { question: string; count: number }[] {
+  const FALLBACK_MARKER = "Hva gjelder det?";
+  const counts: Record<string, number> = {};
+
+  for (const c of conversations) {
+    if (!c.has_unanswered) continue;
+    const msgs = c.messages;
+    for (let i = 1; i < msgs.length; i++) {
+      if (msgs[i].role === "assistant" && msgs[i].content.includes(FALLBACK_MARKER)) {
+        const userMsg = msgs[i - 1]?.content?.trim();
+        if (userMsg) {
+          counts[userMsg] = (counts[userMsg] ?? 0) + 1;
+        }
+      }
+    }
+  }
+
+  return Object.entries(counts)
+    .map(([question, count]) => ({ question, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
 function ConversationsTab({ clinicId }: { clinicId: string }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "unanswered" | "booked">("all");
+  const [view, setView] = useState<"insights" | "list">("insights");
 
   useEffect(() => {
     apiFetch(`/api/admin/conversations?clinicId=${encodeURIComponent(clinicId)}`)
@@ -915,13 +938,12 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
       .finally(() => setLoading(false));
   }, [clinicId]);
 
-  const filtered = conversations.filter(c => {
-    if (filter === "unanswered") return c.has_unanswered;
-    if (filter === "booked") return c.ended_in_booking;
-    return true;
-  });
-
-  const unansweredCount = conversations.filter(c => c.has_unanswered).length;
+  const total = conversations.length;
+  const booked = conversations.filter(c => c.ended_in_booking).length;
+  const unanswered = conversations.filter(c => c.has_unanswered).length;
+  const bookingRate = total > 0 ? Math.round((booked / total) * 100) : 0;
+  const unansweredRate = total > 0 ? Math.round((unanswered / total) * 100) : 0;
+  const unansweredQuestions = extractUnansweredQuestions(conversations);
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorBox msg={error} />;
@@ -929,82 +951,128 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-ink-900">Samtaler</h2>
-          {unansweredCount > 0 && (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-              {unansweredCount} ubesvart
-            </span>
-          )}
+        <h2 className="text-lg font-semibold text-ink-900">Samtaler</h2>
+        <div className="flex gap-1 bg-ink-100 rounded-lg p-1">
+          {([{ key: "insights", label: "Innsikt" }, { key: "list", label: "Alle samtaler" }] as const).map(v => (
+            <button key={v.key} onClick={() => setView(v.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${view === v.key ? "bg-white text-ink-900 shadow-sm" : "text-ink-500 hover:text-ink-900"}`}>
+              {v.label}
+            </button>
+          ))}
         </div>
-        <span className="text-sm text-ink-500">{conversations.length} totalt</span>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-1 mb-4 bg-ink-100 rounded-lg p-1 w-fit">
-        {([
-          { key: "all",         label: "Alle" },
-          { key: "unanswered",  label: "Ubesvart" },
-          { key: "booked",      label: "Endte i booking" },
-        ] as const).map(f => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${
-              filter === f.key
-                ? "bg-white text-ink-900 shadow-sm"
-                : "text-ink-500 hover:text-ink-900"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      {/* KPI-kort */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="rounded-xl border border-ink-100 bg-white p-4 text-center">
+          <div className="text-2xl font-bold text-ink-900">{total}</div>
+          <div className="text-xs text-ink-500 mt-0.5">Samtaler totalt</div>
+        </div>
+        <div className="rounded-xl border border-green-100 bg-green-50 p-4 text-center">
+          <div className="text-2xl font-bold text-green-700">{bookingRate}%</div>
+          <div className="text-xs text-green-600 mt-0.5">Endte i booking</div>
+        </div>
+        <div className={`rounded-xl border p-4 text-center ${unansweredRate > 20 ? "border-red-100 bg-red-50" : "border-ink-100 bg-white"}`}>
+          <div className={`text-2xl font-bold ${unansweredRate > 20 ? "text-red-700" : "text-ink-900"}`}>{unansweredRate}%</div>
+          <div className={`text-xs mt-0.5 ${unansweredRate > 20 ? "text-red-600" : "text-ink-500"}`}>AI svarte ikke</div>
+        </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <EmptyState text={filter === "all" ? "Ingen samtaler ennå. Så snart pasienter chatter, dukker de opp her." : "Ingen samtaler i denne kategorien."} />
-      ) : (
-        <div className="space-y-2">
-          {filtered.map(c => {
-            const userMessages = c.messages.filter(m => m.role === "user");
-            const firstMsg = userMessages[0]?.content ?? "—";
-            const isOpen = expanded === c.id;
-            return (
-              <div key={c.id} className="rounded-xl border border-ink-100 bg-white overflow-hidden">
-                <button
-                  onClick={() => setExpanded(isOpen ? null : c.id)}
-                  className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-ink-50 transition"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                      {c.has_unanswered && (
-                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100 font-medium">Ubesvart</span>
-                      )}
-                      {c.ended_in_booking && (
-                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100 font-medium">Booking</span>
-                      )}
-                      <span className="text-xs text-ink-400">{fmtCreated(c.created_at)}</span>
-                      <span className="text-xs text-ink-400">· {c.messages.length} meldinger</span>
+      {view === "insights" ? (
+        <div className="space-y-5">
+          {/* Hva AI-en ikke klarer */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">Trengs å fikses</p>
+              {unansweredQuestions.length > 0 && (
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">{unansweredQuestions.length} spørsmål</span>
+              )}
+            </div>
+            {unansweredQuestions.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-green-200 bg-green-50 py-6 text-center">
+                <p className="text-sm text-green-700 font-medium">AI-en svarte på alt 🎉</p>
+                <p className="text-xs text-green-600 mt-1">Ingen ubesvarte spørsmål ennå.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-ink-100 bg-white overflow-hidden">
+                {unansweredQuestions.map((q, i) => (
+                  <div key={i} className={`flex items-center gap-3 px-4 py-3 ${i < unansweredQuestions.length - 1 ? "border-b border-ink-100" : ""}`}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-ink-800 truncate">"{q.question}"</p>
                     </div>
-                    <p className="text-sm text-ink-700 truncate">{firstMsg}</p>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                      q.count >= 3 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                    }`}>
+                      {q.count}×
+                    </span>
                   </div>
-                  <svg
-                    className={`h-4 w-4 text-ink-400 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-                {isOpen && (
-                  <div className="border-t border-ink-100 px-4 py-3 space-y-2 bg-ink-50/40 max-h-80 overflow-y-auto">
-                    {c.messages.map((m, i) => (
-                      <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-xs rounded-xl px-3 py-2 text-xs ${
-                          m.role === "user"
-                            ? "bg-ink-900 text-white rounded-br-sm"
-                            : "bg-white border border-ink-100 text-ink-700 rounded-bl-sm"
-                        }`}>
+          {/* Siste aktivitet */}
+          <div>
+            <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Siste samtaler</p>
+            {conversations.length === 0 ? (
+              <EmptyState text="Ingen samtaler ennå. Så snart pasienter chatter, dukker de opp her." />
+            ) : (
+              <div className="space-y-2">
+                {conversations.slice(0, 5).map(c => {
+                  const firstMsg = c.messages.find(m => m.role === "user")?.content ?? "—";
+                  return (
+                    <div key={c.id} className="rounded-xl border border-ink-100 bg-white px-4 py-3 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-ink-700 truncate">{firstMsg}</p>
+                        <p className="text-xs text-ink-400 mt-0.5">{fmtCreated(c.created_at)} · {c.messages.length} meldinger</p>
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        {c.ended_in_booking && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100">Booking</span>}
+                        {c.has_unanswered && <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100">Ubesvart</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Liste-visning */
+        conversations.length === 0 ? (
+          <EmptyState text="Ingen samtaler ennå." />
+        ) : (
+          <div className="space-y-2">
+            {conversations.map(c => {
+              const firstMsg = c.messages.find(m => m.role === "user")?.content ?? "—";
+              const isOpen = expanded === c.id;
+              return (
+                <div key={c.id} className="rounded-xl border border-ink-100 bg-white overflow-hidden">
+                  <button onClick={() => setExpanded(isOpen ? null : c.id)}
+                    className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-ink-50 transition">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        {c.has_unanswered && <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100 font-medium">Ubesvart</span>}
+                        {c.ended_in_booking && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100 font-medium">Booking</span>}
+                        <span className="text-xs text-ink-400">{fmtCreated(c.created_at)}</span>
+                        <span className="text-xs text-ink-400">· {c.messages.length} meldinger</span>
+                      </div>
+                      <p className="text-sm text-ink-700 truncate">{firstMsg}</p>
+                    </div>
+                    <svg className={`h-4 w-4 text-ink-400 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {isOpen && (
+                    <div className="border-t border-ink-100 px-4 py-3 space-y-2 bg-ink-50/40 max-h-80 overflow-y-auto">
+                      {c.messages.map((m, i) => (
+                        <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                          <div className={`max-w-xs rounded-xl px-3 py-2 text-xs ${
+                            m.role === "user"
+                              ? "bg-ink-900 text-white rounded-br-sm"
+                              : "bg-white border border-ink-100 text-ink-700 rounded-bl-sm"
+                          }`}>
                           {m.content}
                         </div>
                       </div>
