@@ -159,12 +159,27 @@ function matchSymptom(m: string): SymptomMatch | null {
 
 // --- Intent routing ---
 
+const TODAY_TIMES = ["09:00", "10:30", "13:00", "14:30", "15:30"];
+
+function isUrgent(m: string): boolean {
+  return matchAny(m, ["i dag", "nå", "asap", "snarest", "så fort", "med en gang", "akutt", "umiddelbart", "første ledige", "første mulige", "så snart"]);
+}
+
 function route(message: string, history: ChatMessage[]): ChatResponse {
   const m = norm(message);
+  const urgent = isUrgent(m);
 
-  // 1) Symptom check – runs before everything else
+  // 1) Symptom check — if urgent, skip treatment selection and go straight to booking
   const symptom = matchSymptom(m);
   if (symptom) {
+    if (urgent || symptom.urgency === "akutt") {
+      const times = TODAY_TIMES.slice(0, 4);
+      return {
+        reply: `Det høres vondt ut — vi tar det på alvor.\n\n**Vi har disse tidene ledig i dag:**\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken tid passer?`,
+        action: { type: "start_booking", serviceId: symptom.serviceId },
+        suggestions: times,
+      };
+    }
     return {
       reply: symptom.reply,
       action: { type: "start_booking", serviceId: symptom.serviceId },
@@ -177,15 +192,35 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
     matchAny(m, ["book", "bestille", "bestill", "reservere", "sette opp", "time", "avtale", "ledig time", "ny time"]) &&
     !matchAny(m, ["avbest", "avlys", "kansell", "flytte", "endre"])
   ) {
+    // Urgent: skip treatment choice, show today's times immediately
+    if (urgent) {
+      const times = TODAY_TIMES.slice(0, 4);
+      return {
+        reply: `Vi har disse tidene ledig i dag:\n\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
+        action: { type: "start_booking", serviceId: "undersokelse" },
+        suggestions: times,
+      };
+    }
+
     const matchedService = clinicConfig.services.find(s =>
       m.includes(norm(s.name)) || m.includes(s.id)
     );
     return {
       reply: matchedService
-        ? `Selvsagt! Jeg hjelper deg med å bestille **${matchedService.name}** (${formatNok(matchedService.priceNok)}, ${matchedService.durationMinutes} min). La oss finne en tid som passer.`
-        : "Flott! Jeg hjelper deg å bestille time. Hvilken behandling gjelder det?",
+        ? `Jeg hjelper deg med **${matchedService.name}** (${formatNok(matchedService.priceNok)}, ${matchedService.durationMinutes} min). La oss finne en tid.`
+        : "Jeg hjelper deg å bestille time. Hva gjelder det — eller vil du bare ha første ledige?",
       action: { type: "start_booking", serviceId: matchedService?.id },
-      suggestions: matchedService ? [] : ["Akuttkonsultasjon", "Undersøkelse", "Tannrens", "Fyllning"],
+      suggestions: matchedService ? [] : ["Første ledige time", "Akuttkonsultasjon", "Undersøkelse", "Tannrens"],
+    };
+  }
+
+  // 2b) "Første ledige" — skip everything, show times now
+  if (matchAny(m, ["første ledige", "første mulige", "når er dere ledig", "når har dere ledig"])) {
+    const times = TODAY_TIMES.slice(0, 4);
+    return {
+      reply: `Første ledige tider i dag:\n\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
+      action: { type: "start_booking", serviceId: "undersokelse" },
+      suggestions: times,
     };
   }
 
@@ -233,7 +268,7 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
   // 7) Greetings
   if (matchAny(m, ["hei", "hallo", "god dag", "god morgen", "halla", "heisann"])) {
     return {
-      reply: `Hei! 👋 Jeg er den digitale resepsjonisten til ${clinicConfig.name}. Jeg hjelper deg med timer, priser og spørsmål – døgnet rundt.\n\nHva kan jeg hjelpe deg med?`,
+      reply: `Hei! 👋 Jeg er her for deg – kan hjelpe med time, priser, symptomer og åpningstider.\n\nHva kan jeg gjøre for deg?`,
       suggestions: ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"],
     };
   }
@@ -241,7 +276,7 @@ function route(message: string, history: ChatMessage[]): ChatResponse {
   // 8) Thanks
   if (matchAny(m, ["takk", "tusen takk", "ha det", "snakkes"])) {
     return {
-      reply: "Bare hyggelig! Ta kontakt igjen når som helst. Ha en fin dag! 🦷",
+      reply: "Bare hyggelig. Ta kontakt igjen når som helst 🦷",
     };
   }
 
