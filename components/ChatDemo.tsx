@@ -463,17 +463,28 @@ export default function ChatDemo() {
         <div className="h-[460px] overflow-y-auto scrollbar-thin px-4 py-5 bg-ink-50/40 relative">
           {/* Background waves */}
           <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }} preserveAspectRatio="none" viewBox="0 0 400 460">
-            {[40, 90, 140, 190, 240, 290, 340, 390, 440].map((y, i) => {
-              const opacity = Math.max(0.02, 0.12 - i * 0.012);
-              const amp = Math.max(1.5, 4 - i * 0.3);
+            <style>{`
+              @keyframes waveDrift {
+                0% { transform: translateX(0px); }
+                50% { transform: translateX(12px); }
+                100% { transform: translateX(0px); }
+              }
+            `}</style>
+            {Array.from({ length: 18 }).map((_, i) => {
+              const y = 20 + i * 26;
+              const opacity = Math.max(0.025, 0.11 - i * 0.005);
+              const amp = Math.max(2, 5 - i * 0.15);
+              const duration = 4 + (i % 3) * 1.5;
+              const delay = (i % 4) * 0.6;
               return (
                 <path
                   key={i}
-                  d={`M0,${y} C50,${y - amp} 100,${y + amp} 200,${y} S300,${y - amp} 400,${y}`}
+                  d={`M-20,${y} C30,${y - amp} 80,${y + amp} 150,${y} S250,${y - amp} 320,${y} S380,${y + amp} 420,${y}`}
                   fill="none"
                   stroke="#000"
-                  strokeWidth="1"
+                  strokeWidth="0.8"
                   opacity={opacity}
+                  style={{ animation: `waveDrift ${duration}s ease-in-out ${delay}s infinite` }}
                 />
               );
             })}

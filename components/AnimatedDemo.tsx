@@ -76,12 +76,29 @@ export default function AnimatedDemo() {
         {/* Messages */}
         <div className="h-80 overflow-hidden px-4 py-4 bg-ink-50/40 space-y-3 relative">
           <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }} preserveAspectRatio="none" viewBox="0 0 400 320">
-            {[40, 90, 140, 190, 240, 290].map((y, i) => {
-              const opacity = Math.max(0.02, 0.12 - i * 0.015);
-              const amp = Math.max(1.5, 4 - i * 0.4);
+            <style>{`
+              @keyframes waveDriftA {
+                0% { transform: translateX(0px); }
+                50% { transform: translateX(12px); }
+                100% { transform: translateX(0px); }
+              }
+            `}</style>
+            {Array.from({ length: 13 }).map((_, i) => {
+              const y = 18 + i * 24;
+              const opacity = Math.max(0.025, 0.11 - i * 0.006);
+              const amp = Math.max(2, 5 - i * 0.2);
+              const duration = 4 + (i % 3) * 1.5;
+              const delay = (i % 4) * 0.6;
               return (
-                <path key={i} d={`M0,${y} C50,${y - amp} 100,${y + amp} 200,${y} S300,${y - amp} 400,${y}`}
-                  fill="none" stroke="#000" strokeWidth="1" opacity={opacity} />
+                <path
+                  key={i}
+                  d={`M-20,${y} C30,${y - amp} 80,${y + amp} 150,${y} S250,${y - amp} 320,${y} S380,${y + amp} 420,${y}`}
+                  fill="none"
+                  stroke="#000"
+                  strokeWidth="0.8"
+                  opacity={opacity}
+                  style={{ animation: `waveDriftA ${duration}s ease-in-out ${delay}s infinite` }}
+                />
               );
             })}
           </svg>
