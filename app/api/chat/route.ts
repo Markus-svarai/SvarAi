@@ -238,9 +238,14 @@ export async function POST(req: NextRequest) {
     let response: ChatResponse;
     try {
       response = await callClaude(systemPrompt, history, message);
-    } catch (err) {
-      console.error("Claude API feil:", err);
+    } catch (err: any) {
+      console.error("Claude API feil:", err?.message ?? err);
+      console.error("ANTHROPIC_API_KEY satt:", !!process.env.ANTHROPIC_API_KEY);
       response = fallbackResponse(config);
+      // Returner feildetaljer i dev
+      if (process.env.NODE_ENV !== "production") {
+        response.reply = `Debug: ${err?.message ?? String(err)}`;
+      }
     }
 
     // Lagre samtale i Supabase (asynkront)
