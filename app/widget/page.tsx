@@ -284,7 +284,7 @@ export default function WidgetPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>(["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]);
+  const [suggestions, setSuggestions] = useState<string[]>(["Jeg har smerter", "Vil sjekke noe", "Book time", "Åpningstider"]);
   const [blocked, setBlocked] = useState(false);
   const [booking, setBooking] = useState<BookingState>(INIT_BOOKING);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -308,9 +308,9 @@ export default function WidgetPage() {
     fetch(`/api/widget-check?id=${encodeURIComponent(clinicId)}`)
       .then(res => {
         if (!res.ok) setBlocked(true);
-        else addAssistantMessage("Hei! Jeg er resepsjonisten her. Hva kan jeg hjelpe deg med?", ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]);
+        else addAssistantMessage("Hei! Jeg er resepsjonisten her. Hva kan jeg hjelpe deg med?", ["Jeg har smerter", "Vil sjekke noe", "Book time", "Åpningstider"]);
       })
-      .catch(() => addAssistantMessage("Hei! Jeg er resepsjonisten her. Hva kan jeg hjelpe deg med?", ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]));
+      .catch(() => addAssistantMessage("Hei! Jeg er resepsjonisten her. Hva kan jeg hjelpe deg med?", ["Jeg har smerter", "Vil sjekke noe", "Book time", "Åpningstider"]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
