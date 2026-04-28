@@ -15,10 +15,10 @@ type Step =
 
 const STEPS: Step[] = [
   { type: "msg", role: "assistant", text: "Hei! Jeg er resepsjonisten her. Hva kan jeg hjelpe deg med?" },
-  { type: "msg", role: "user",      text: "Jeg har veldig vondt i en tann bak, det banker og stikker" },
-  { type: "msg", role: "assistant", text: "Det høres akutt ut — dette bør vi se på raskt. Vi har ledige tider i dag. Vil du booke?" },
-  { type: "msg", role: "user",      text: "Ja gjerne" },
-  { type: "msg", role: "assistant", text: "Velg en tid som passer:" },
+  { type: "msg", role: "user",      text: "Jeg vet ikke helt hva jeg trenger, men har hatt litt ubehag" },
+  { type: "msg", role: "assistant", text: "Har du smerter, eller er det mer noe du vil få sjekket?" },
+  { type: "msg", role: "user",      text: "Litt smerter av og til, kommer og går" },
+  { type: "msg", role: "assistant", text: "Da setter vi opp en undersøkelse — la meg vise deg ledige tider." },
   { type: "show_slots" },
   { type: "select_slot", time: "10:30" },
   { type: "show_form" },
@@ -26,7 +26,8 @@ const STEPS: Step[] = [
   { type: "done" },
 ];
 
-const STEP_DELAYS = [500, 2000, 3800, 5800, 7200, 7800, 10500, 11200, 15000, 15800];
+//                   hei   user1  ai1   user2  ai2   slots  klikk  form   fill   done
+const STEP_DELAYS = [500,  2200,  4200, 6500,  8800, 9600,  12500, 13300, 17000, 17800];
 const RESTART_DELAY = 5000;
 
 const SLOTS = ["09:00", "10:30", "13:00", "14:30"];
