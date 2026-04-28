@@ -284,7 +284,6 @@ export default function WidgetPage() {
   const [suggestions, setSuggestions] = useState<string[]>(["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]);
   const [blocked, setBlocked] = useState(false);
   const [booking, setBooking] = useState<BookingState>(INIT_BOOKING);
-  const [pendingServiceId, setPendingServiceId] = useState<string | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -344,7 +343,11 @@ export default function WidgetPage() {
       addAssistantMessage(data.reply, data.suggestions);
 
       if (data.action?.type === "start_booking" && data.action.serviceId) {
-        setPendingServiceId(data.action.serviceId);
+        const sid = data.action.serviceId as string;
+        setTimeout(() => {
+          setBooking({ ...INIT_BOOKING, step: "slots", serviceId: sid });
+          setSuggestions([]);
+        }, 500);
       }
     } catch {
       addAssistantMessage("Beklager, noe gikk galt. Prøv igjen.");
@@ -356,20 +359,9 @@ export default function WidgetPage() {
   function handleSuggestionClick(s: string) {
     if (s === "Book en ny time") {
       setBooking(INIT_BOOKING);
-      setPendingServiceId(null);
       send("Book time");
       return;
     }
-
-    // Trigger slot picker if pending booking + book-click
-    if (pendingServiceId && (s.toLowerCase().includes("book") || s.toLowerCase().includes("bestill") || s.toLowerCase().includes("fortsett"))) {
-      addUserMessage(s);
-      setSuggestions([]);
-      setBooking({ ...INIT_BOOKING, step: "slots", serviceId: pendingServiceId });
-      setPendingServiceId(null);
-      return;
-    }
-
     send(s);
   }
 
@@ -410,18 +402,6 @@ export default function WidgetPage() {
     }
   }
 
-  // When AI triggers booking and user hasn't clicked yet — auto-show slots
-  useEffect(() => {
-    if (pendingServiceId && !loading) {
-      // Small delay so the message renders first
-      const t = setTimeout(() => {
-        setBooking({ ...INIT_BOOKING, step: "slots", serviceId: pendingServiceId });
-        setPendingServiceId(null);
-        setSuggestions([]);
-      }, 400);
-      return () => clearTimeout(t);
-    }
-  }, [pendingServiceId, loading]);
 
   if (blocked) {
     return (
