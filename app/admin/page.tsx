@@ -955,9 +955,10 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
 
   const total = conversations.length;
   const booked = conversations.filter(c => c.ended_in_booking).length;
-  const unanswered = conversations.filter(c => c.has_unanswered).length;
+  const abandoned = conversations.filter(c => c.messages.length < 3).length;
+  const calledInstead = conversations.filter(c => c.has_unanswered).length;
   const bookingRate = total > 0 ? Math.round((booked / total) * 100) : 0;
-  const unansweredRate = total > 0 ? Math.round((unanswered / total) * 100) : 0;
+  const abandonedRate = total > 0 ? Math.round((abandoned / total) * 100) : 0;
   const unansweredQuestions = extractUnansweredQuestions(conversations);
 
   if (loading) return <LoadingSpinner />;
@@ -978,35 +979,66 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
       </div>
 
       {/* KPI-kort */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <div className="rounded-xl border border-ink-100 bg-white p-4 text-center">
           <div className="text-2xl font-bold text-ink-900">{total}</div>
           <div className="text-xs text-ink-500 mt-0.5">Samtaler totalt</div>
         </div>
-        <div className="rounded-xl border border-green-100 bg-green-50 p-4 text-center">
-          <div className="text-2xl font-bold text-green-700">{bookingRate}%</div>
-          <div className="text-xs text-green-600 mt-0.5">Endte i booking</div>
+        <div className={`rounded-xl border p-4 text-center ${bookingRate > 0 ? "border-green-100 bg-green-50" : "border-ink-100 bg-white"}`}>
+          <div className={`text-2xl font-bold ${bookingRate > 0 ? "text-green-700" : "text-ink-900"}`}>{bookingRate}%</div>
+          <div className={`text-xs mt-0.5 ${bookingRate > 0 ? "text-green-600" : "text-ink-500"}`}>Endte i booking</div>
         </div>
-        <div className={`rounded-xl border p-4 text-center ${unansweredRate > 20 ? "border-red-100 bg-red-50" : "border-ink-100 bg-white"}`}>
-          <div className={`text-2xl font-bold ${unansweredRate > 20 ? "text-red-700" : "text-ink-900"}`}>{unansweredRate}%</div>
-          <div className={`text-xs mt-0.5 ${unansweredRate > 20 ? "text-red-600" : "text-ink-500"}`}>AI svarte ikke</div>
+        <div className={`rounded-xl border p-4 text-center ${abandonedRate > 30 ? "border-amber-100 bg-amber-50" : "border-ink-100 bg-white"}`}>
+          <div className={`text-2xl font-bold ${abandonedRate > 30 ? "text-amber-700" : "text-ink-900"}`}>{abandoned}</div>
+          <div className={`text-xs mt-0.5 ${abandonedRate > 30 ? "text-amber-600" : "text-ink-500"}`}>Avbrutte samtaler</div>
+          <div className="text-xs text-ink-400 mt-0.5">under 3 meldinger</div>
+        </div>
+        <div className={`rounded-xl border p-4 text-center ${calledInstead > 2 ? "border-red-100 bg-red-50" : "border-ink-100 bg-white"}`}>
+          <div className={`text-2xl font-bold ${calledInstead > 2 ? "text-red-700" : "text-ink-900"}`}>{calledInstead}</div>
+          <div className={`text-xs mt-0.5 ${calledInstead > 2 ? "text-red-600" : "text-ink-500"}`}>Ringte oss i stedet</div>
+          <div className="text-xs text-ink-400 mt-0.5">boten visste ikke svaret</div>
         </div>
       </div>
 
       {view === "insights" ? (
         <div className="space-y-5">
-          {/* Hva AI-en ikke klarer */}
+
+          {/* Avbrutte samtaler */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">Trengs å fikses</p>
-              {unansweredQuestions.length > 0 && (
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">{unansweredQuestions.length} spørsmål</span>
-              )}
+              <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">Avbrutte samtaler</p>
+              {abandoned > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">{abandoned} stk</span>}
+            </div>
+            {abandoned === 0 ? (
+              <div className="rounded-xl border border-dashed border-green-200 bg-green-50 py-5 text-center">
+                <p className="text-sm text-green-700 font-medium">Ingen avbrutte samtaler</p>
+                <p className="text-xs text-green-600 mt-1">Alle pasienter sendte minst 3 meldinger.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-ink-100 bg-white overflow-hidden">
+                {conversations.filter(c => c.messages.length < 3).slice(0, 5).map((c, i, arr) => (
+                  <div key={c.id} className={`flex items-center gap-3 px-4 py-3 ${i < arr.length - 1 ? "border-b border-ink-100" : ""}`}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-ink-800 truncate">"{c.messages.find(m => m.role === "user")?.content ?? "—"}"</p>
+                      <p className="text-xs text-ink-400 mt-0.5">{fmtCreated(c.created_at)} · {c.messages.length} melding{c.messages.length !== 1 ? "er" : ""}</p>
+                    </div>
+                  </div>
+                ))}
+                {abandoned > 5 && <div className="px-4 py-2 border-t border-ink-100 text-xs text-ink-400">+ {abandoned - 5} til</div>}
+              </div>
+            )}
+          </div>
+
+          {/* Ringte oss i stedet */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">Ringte oss i stedet</p>
+              {calledInstead > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">{calledInstead} stk</span>}
             </div>
             {unansweredQuestions.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-green-200 bg-green-50 py-6 text-center">
-                <p className="text-sm text-green-700 font-medium">AI-en svarte på alt 🎉</p>
-                <p className="text-xs text-green-600 mt-1">Ingen ubesvarte spørsmål ennå.</p>
+              <div className="rounded-xl border border-dashed border-green-200 bg-green-50 py-5 text-center">
+                <p className="text-sm text-green-700 font-medium">Boten håndterte alt selv</p>
+                <p className="text-xs text-green-600 mt-1">Ingen pasienter ble henvist til telefon.</p>
               </div>
             ) : (
               <div className="rounded-xl border border-ink-100 bg-white overflow-hidden">
@@ -1014,10 +1046,9 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
                   <div key={i} className={`flex items-center gap-3 px-4 py-3 ${i < unansweredQuestions.length - 1 ? "border-b border-ink-100" : ""}`}>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-ink-800 truncate">"{q.question}"</p>
+                      <p className="text-xs text-ink-400 mt-0.5">Pasienten ble henvist til telefon</p>
                     </div>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                      q.count >= 3 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
-                    }`}>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${q.count >= 3 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
                       {q.count}×
                     </span>
                   </div>
@@ -1043,7 +1074,7 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
                       </div>
                       <div className="flex gap-1.5 shrink-0">
                         {c.ended_in_booking && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100">Booking</span>}
-                        {c.has_unanswered && <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100">Ubesvart</span>}
+                        {c.has_unanswered && <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100">Ringte oss</span>}
                       </div>
                     </div>
                   );

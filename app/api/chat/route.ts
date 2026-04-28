@@ -287,11 +287,14 @@ export async function POST(req: NextRequest) {
         { role: "assistant", content: response.reply },
       ];
       const isBookingTriggered = response.action?.type === "start_booking";
+      // Detekter om boten sendte pasienten til telefon (visste ikke svaret)
+      const redirectedToPhone = !isBookingTriggered &&
+        response.reply.includes(config.contact.phone);
       upsertConversation({
         clinic_id: clinicId,
         session_id: sessionId,
         messages: updatedMessages,
-        has_unanswered: response.unanswered === true,
+        has_unanswered: response.unanswered === true || redirectedToPhone,
         ...(isBookingTriggered ? { ended_in_booking: true } : {}),
       }).catch(() => {});
     }
