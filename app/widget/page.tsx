@@ -19,15 +19,18 @@ const INIT_BOOKING: BookingState = {
 // ── Dag-helpers ────────────────────────────────────────────────────────────
 
 function getUpcomingDays(count = 14) {
-  const days: { label: string; short: string; value: string }[] = [];
+  const days: { label: string; short: string; value: string; display: string }[] = [];
   const today = new Date();
   for (let i = 0; days.length < count; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
+    const isoValue = d.toLocaleDateString("sv-SE"); // YYYY-MM-DD for API
+    const [y, m, day] = isoValue.split("-");
     days.push({
       label: d.toLocaleDateString("nb-NO", { weekday: "long", day: "numeric", month: "long" }),
       short: i === 0 ? "I dag" : i === 1 ? "I morgen" : d.toLocaleDateString("nb-NO", { weekday: "short", day: "numeric", month: "short" }),
-      value: d.toLocaleDateString("sv-SE"),
+      value: isoValue,
+      display: `${day}.${m}.${y}`,
     });
   }
   return days;
@@ -94,7 +97,7 @@ function SlotPicker({ clinicId, serviceId, brandColor, onSelect }: {
 
         <div style={{ textAlign: "center" }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: "#111" }}>{currentDay.short}</div>
-          <div style={{ fontSize: 11, color: "#9ca3af" }}>{currentDay.value}</div>
+          <div style={{ fontSize: 11, color: "#9ca3af" }}>{currentDay.display}</div>
         </div>
 
         <button
