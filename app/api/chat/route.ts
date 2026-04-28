@@ -18,158 +18,7 @@ type ChatResponse = {
   unanswered?: boolean;
 };
 
-function norm(s: string) {
-  return s.toLowerCase().replace(/[.,!?]/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function matchAny(text: string, patterns: string[]): boolean {
-  const n = norm(text);
-  return patterns.some(p => n.includes(p));
-}
-
-function renderHours(config: ClinicConfig): string {
-  const lines = config.openingHours.map(h => {
-    if (!h.open || !h.close) return `• ${h.day}: Stengt`;
-    return `• ${h.day}: ${h.open}–${h.close}`;
-  });
-  const status = isOpenNow(config)
-    ? "✅ Vi har åpent nå."
-    : "🔒 Vi har stengt akkurat nå.";
-  return `${status}\n\nÅpningstider:\n${lines.join("\n")}`;
-}
-
-function renderServices(config: ClinicConfig): string {
-  const lines = config.services.map(
-    s => `• **${s.name}** – ${formatNok(s.priceNok)} (${s.durationMinutes} min)\n   ${s.description}`
-  );
-  return `Her er tjenestene våre:\n\n${lines.join("\n\n")}\n\nØnsker du å bestille en time?`;
-}
-
-function renderContact(config: ClinicConfig): string {
-  const a = config.address;
-  return [
-    `📍 **Adresse:** ${a.street}, ${a.postalCode} ${a.city}`,
-    `📞 **Telefon:** ${config.contact.phone}`,
-    `✉️ **E-post:** ${config.contact.email}`,
-    `🌐 **Nettside:** ${config.contact.website}`,
-  ].join("\n");
-}
-
-function renderCancellation(config: ClinicConfig): string {
-  return [
-    "Du kan avbestille eller endre timen din slik:",
-    "",
-    `• Her i chatten – si bare "jeg vil avbestille"`,
-    `• Telefon: ${config.contact.phone}`,
-    `• E-post: ${config.contact.email}`,
-    "",
-    `ℹ️ ${config.cancellationPolicy}`,
-  ].join("\n");
-}
-
-// --- Symptom intelligence ---
-
-type SymptomMatch = {
-  serviceId: string;
-  urgency: "akutt" | "snart" | "rutine";
-  reply: string;
-  suggestions: string[];
-};
-
-function getServicePrice(config: ClinicConfig, serviceId: string, fallback: number): number {
-  const service = config.services.find(s => s.id === serviceId);
-  return service ? service.priceNok : fallback;
-}
-
-function matchSymptom(m: string, config: ClinicConfig): SymptomMatch | null {
-  const akuttPris = getServicePrice(config, "akutt", 890);
-  const undersokelsePris = getServicePrice(config, "undersokelse", 790);
-  const fyllningPris = getServicePrice(config, "fyllning", 1290);
-  const tannrensPris = getServicePrice(config, "tannrens", 990);
-
-  // Akutt smerte / hevelse
-  if (matchAny(m, ["vondt", "tannpine", "smerte", "verker", "banker", "stikker", "prikker", "pulserer", "hardt vondt", "veldig vondt"])) {
-    const hasSwelling = matchAny(m, ["hoven", "hevelse", "hovner", "kinn", "betennelse"]);
-    if (hasSwelling) {
-      return {
-        serviceId: "akutt",
-        urgency: "akutt",
-        reply: `Det høres ut som en mulig **tanninfeksjon eller abscess** – hevelse i kjeven kan være alvorlig og bør undersøkes **så fort som mulig**.\n\n⚠️ Vi anbefaler en **akuttkonsultasjon i dag** (${formatNok(akuttPris)}, 30 min).\n\nVil du se ledige tider?`,
-        suggestions: ["Book akuttkonsultasjon", "Ring oss", "Mer info"],
-      };
-    }
-    return {
-      serviceId: "akutt",
-      urgency: "akutt",
-      reply: `Det høres ut som **tannpine** – dette kan skyldes et hull, sprukket tann, eller betennelse i tannroten.\n\n🦷 Vi anbefaler en **akuttkonsultasjon** så snart som mulig (${formatNok(akuttPris)}, 30 min). Legen vil undersøke og fortelle deg nøyaktig hva som må gjøres.\n\nVil du booke en time?`,
-      suggestions: ["Book akuttkonsultasjon", "Se alle tider", "Hva koster det?"],
-    };
-  }
-
-  // Brukket eller løs tann
-  if (matchAny(m, ["brukket", "knekt", "løs tann", "falt ut", "mistet tann", "slått ut", "chip", "flekk av"])) {
-    return {
-      serviceId: "akutt",
-      urgency: "akutt",
-      reply: `En **brukket eller løs tann** bør undersøkes **snarest mulig** – jo raskere vi ser på det, jo større sjanse er det for å redde tannen.\n\n🦷 Vi anbefaler **akuttkonsultasjon** i dag (${formatNok(akuttPris)}, 30 min).\n\nVil du booke en time nå?`,
-      suggestions: ["Book akuttkonsultasjon", "Ring oss direkte", "Åpningstider"],
-    };
-  }
-
-  // Hull / karies
-  if (matchAny(m, ["hull", "karies", "råte", "svart tann", "mørk tann", "fyllning", "fyllning har falt"])) {
-    return {
-      serviceId: "fyllning",
-      urgency: "snart",
-      reply: `Det høres ut som du trenger en **fyllning** – dette er en vanlig behandling der vi fjerner karies og fyller hullet med en hvit komposittfyllning.\n\n🦷 **Fyllning:** ${formatNok(fyllningPris)}, ca. 45 min. Smertefritt med lokalbedøvelse.\n\nVil du booke en time?`,
-      suggestions: ["Book fyllning", "Hva skjer under behandlingen?", "Se priser"],
-    };
-  }
-
-  // Følsomhet
-  if (matchAny(m, ["følsom", "sensitiv", "kaldt", "varmt", "søtt", "surt", "ising", "iset", "isnende"])) {
-    return {
-      serviceId: "undersokelse",
-      urgency: "snart",
-      reply: `**Følsomhet for kaldt, varmt eller søtt** kan tyde på:\n\n• Hull (karies) i en tann\n• Slitt tannemalje\n• Tannhalsen er blottlagt\n\n🦷 Vi anbefaler en **undersøkelse** så vi finner årsaken og kan gi riktig behandling (${formatNok(undersokelsePris)}, 45 min inkl. røntgen).\n\nVil du booke en undersøkelse?`,
-      suggestions: ["Book undersøkelse", "Se priser", "Åpningstider"],
-    };
-  }
-
-  // Tannkjøtt / blødning
-  if (matchAny(m, ["tannkjøtt", "blør", "blødning", "rødt", "betent tannkjøtt", "periodontitt", "løs", "trekker seg"])) {
-    return {
-      serviceId: "tannrens",
-      urgency: "snart",
-      reply: `**Blødende eller betent tannkjøtt** er ofte et tegn på **tannkjøttbetennelse (gingivitt)** eller **periodontitt**. Det er viktig å ta det på alvor – ubehandlet kan det føre til tannløsning.\n\n🦷 Vi anbefaler **tannrens og undersøkelse** (${formatNok(tannrensPris)}, 60 min) for å fjerne bakterier og vurdere tilstanden.\n\nVil du booke en time?`,
-      suggestions: ["Book tannrens", "Hva er periodontitt?", "Se priser"],
-    };
-  }
-
-  // Visdomstann
-  if (matchAny(m, ["visdomstann", "visdomstanna", "bakerste tann", "siste tann", "tann bak"])) {
-    return {
-      serviceId: "trekking",
-      urgency: "snart",
-      reply: `Problemer med **visdomstenner** er veldig vanlig. De kan:\n\n• Vokse skjevt og dytte på andre tenner\n• Bli delvis gjennombrutt og infisert\n• Skape vondt og hevelse\n\n🦷 Vi anbefaler en **undersøkelse med røntgen** (${formatNok(undersokelsePris)}) for å se hvordan visdomstannen ligger. Deretter vurderer vi om den bør trekkes.\n\nVil du booke?`,
-      suggestions: ["Book undersøkelse", "Hva koster uttrekking?", "Åpningstider"],
-    };
-  }
-
-  // Tannrens / rutine
-  if (matchAny(m, ["rens", "puss", "tannstein", "misfarging", "gult", "kontroll", "sjekk", "rutine", "halvår", "årlig"])) {
-    return {
-      serviceId: "tannrens",
-      urgency: "rutine",
-      reply: `**Regelmessig tannrens** anbefales minst hvert halvår. Vi fjerner tannstein, pussen tennene og sjekker at alt er bra.\n\n🦷 **Tannrens og puss:** ${formatNok(tannrensPris)}, 60 min.\n\nVil du booke en time?`,
-      suggestions: ["Book tannrens", "Se åpningstider", "Priser"],
-    };
-  }
-
-  return null;
-}
-
-// --- Availability helper ---
+// ── Availability helper ────────────────────────────────────────────────────
 
 async function getAvailableSlots(
   clinicId: string,
@@ -183,14 +32,14 @@ async function getAvailableSlots(
     );
     if (!res.ok) return [];
     const data = await res.json();
-    return (data.slots ?? []).slice(0, 5).map((s: { time: string }) => s.time);
+    return (data.slots ?? []).slice(0, 6).map((s: { time: string }) => s.time);
   } catch {
-    return ["09:00", "10:30", "13:00", "14:30"];
+    return [];
   }
 }
 
 function todayStr(): string {
-  return new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD
+  return new Date().toLocaleDateString("sv-SE");
 }
 
 function tomorrowStr(): string {
@@ -205,438 +54,156 @@ function tomorrowLabel(): string {
   return d.toLocaleDateString("nb-NO", { weekday: "long" });
 }
 
-// --- Intent routing ---
+// ── Build system prompt ────────────────────────────────────────────────────
 
-function isUrgent(m: string): boolean {
-  return matchAny(m, ["i dag", "nå", "asap", "snarest", "så fort", "med en gang", "akutt", "umiddelbart", "første ledige", "første mulige", "så snart"]);
+function buildSystemPrompt(
+  config: ClinicConfig,
+  todaySlots: Record<string, string[]>,
+  tomorrowSlots: Record<string, string[]>
+): string {
+  const hours = config.openingHours
+    .map(h => (!h.open ? `${h.day}: Stengt` : `${h.day}: ${h.open}–${h.close}`))
+    .join(", ");
+
+  const services = config.services
+    .map(s => `- ${s.name} (id: ${s.id}): ${formatNok(s.priceNok)}, ${s.durationMinutes} min — ${s.description}`)
+    .join("\n");
+
+  const slotsSection = config.services.map(s => {
+    const today = todaySlots[s.id] ?? [];
+    const tomorrow = tomorrowSlots[s.id] ?? [];
+    if (today.length === 0 && tomorrow.length === 0) return `- ${s.name}: ingen ledige tider de nærmeste dagene`;
+    const todayTxt = today.length > 0 ? `i dag: ${today.join(", ")}` : "i dag: fullt";
+    const tomorrowTxt = tomorrow.length > 0 ? `${tomorrowLabel()}: ${tomorrow.join(", ")}` : "";
+    return `- ${s.name} (${s.id}): ${[todayTxt, tomorrowTxt].filter(Boolean).join(" | ")}`;
+  }).join("\n");
+
+  const openStatus = isOpenNow(config) ? "Vi har åpent akkurat nå." : "Vi har stengt akkurat nå.";
+
+  return `Du er en vennlig resepsjonist-assistent for ${config.name}, en tannklinikk i Norge.
+Din oppgave er å hjelpe pasienter med spørsmål, symptomvurdering og timebestilling.
+
+KLINIKK-INFO:
+- Navn: ${config.name}
+- Telefon: ${config.contact.phone}
+- E-post: ${config.contact.email}
+- Adresse: ${config.address.street}, ${config.address.postalCode} ${config.address.city}
+- Åpningstider: ${hours}
+- Status nå: ${openStatus}
+- Avbestillingspolitikk: ${config.cancellationPolicy}
+
+TJENESTER OG PRISER:
+${services}
+
+LEDIGE TIDER:
+${slotsSection}
+
+PERSONLIGHETSREGLER:
+1. Svar alltid direkte på det pasienten faktisk spør om — ikke ignorer spørsmålet og push en booking.
+2. Hvis pasienten er usikker på diagnosen (sier "tror", "kanskje", "ikke sikker"), IKKE konkluder med en spesifikk behandling. Si heller: "Det kan godt hende, men vi starter alltid med en undersøkelse for å finne ut av det."
+3. Pasienten betaler ALDRI for behandling som ikke blir gjort. Si dette tydelig hvis de er bekymret for pris.
+4. Hvis pasienten stiller et nytt spørsmål, svar på DET spørsmålet — ikke gjenta forrige anbefaling.
+5. La pasienten føle at de velger selv. Gi alternativer istedenfor å bestemme for dem.
+6. Vær varm, rolig og ærlig. Ikke pushy eller salgsorientert.
+7. Aldri nevn at du er en AI eller chatbot med mindre pasienten spør direkte.
+8. Svar alltid på norsk.
+9. Hold svar korte og konsise — maks 4-5 setninger om gangen.
+
+BOOKING-REGLER:
+- Trigger "start_booking" kun når pasienten aktivt ønsker en time, ikke ved symptomspørsmål.
+- Bruk serviceId fra tjenestelisten over.
+- Hvis det ikke er ledige tider, be dem ringe: ${config.contact.phone}
+
+SVAR-FORMAT:
+Du MÅ alltid svare med gyldig JSON i dette formatet:
+{
+  "reply": "Melding til pasienten (støtter **bold** og linjeskift med \\n)",
+  "action": {"type": "start_booking", "serviceId": "tjeneste-id"} eller null,
+  "suggestions": ["Alternativ 1", "Alternativ 2", "Alternativ 3"]
 }
 
-function isFearful(m: string): boolean {
-  return matchAny(m, ["redd", "nervøs", "angst", "tannlegeskrekk", "tør ikke", "skummelt", "skummel", "vondt å fikse", "gjør det vondt", "gjør vondt", "smerte under", "smerte av behandling", "frykt", "panikk"]);
+Suggestions skal være korte knapper pasienten kan trykke på (2-4 stykk). Velg dem basert på hva som er logisk neste steg.
+Svar KUN med JSON — ingen tekst rundt.`;
 }
 
-function asksAboutExtraction(m: string): boolean {
-  return matchAny(m, ["trekke tann", "trekkes", "dra ut", "fjerne tann", "må trekke", "trenge trekk", "ta ut tann"]);
+// ── LLM call ──────────────────────────────────────────────────────────────
+
+async function callClaude(
+  systemPrompt: string,
+  history: ChatMessage[],
+  message: string
+): Promise<ChatResponse> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY ikke satt");
+
+  // Bygg meldingshistorikk (maks 10 siste for å holde kontekst)
+  const trimmedHistory = history.slice(-10);
+  const messages = [
+    ...trimmedHistory.map(h => ({ role: h.role, content: h.content })),
+    { role: "user" as const, content: message },
+  ];
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-5",
+      max_tokens: 600,
+      system: systemPrompt,
+      messages,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Claude API feil: ${res.status} ${err}`);
+  }
+
+  const data = await res.json();
+  const raw = data.content?.[0]?.text ?? "";
+
+  // Parse JSON fra svaret
+  try {
+    // Prøv direkte parse
+    return JSON.parse(raw) as ChatResponse;
+  } catch {
+    // Prøv å ekstrahere fra ```json blokk
+    const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (match) {
+      try {
+        return JSON.parse(match[1].trim()) as ChatResponse;
+      } catch { /* fall through */ }
+    }
+    // Prøv å finne første { ... } blokk
+    const objMatch = raw.match(/\{[\s\S]*\}/);
+    if (objMatch) {
+      try {
+        return JSON.parse(objMatch[0]) as ChatResponse;
+      } catch { /* fall through */ }
+    }
+    // Fallback: returner rå tekst som reply
+    return {
+      reply: raw || "Beklager, noe gikk galt. Ring oss gjerne direkte.",
+      suggestions: ["Ring oss", "Book time", "Åpningstider"],
+    };
+  }
 }
 
-function isUnsure(m: string): boolean {
-  return matchAny(m, ["vet ikke", "usikker", "ikke sikker", "ikke helt sikker", "ikke sikker på", "vet ikke hva", "vet ikke helt", "vet egentlig ikke", "vanskelig å si", "ingen anelse"]);
-}
+// ── Fallback (brukes hvis Claude API er nede) ─────────────────────────────
 
-function wantsCheap(m: string): boolean {
-  return matchAny(m, ["billig", "billigst", "rimelig", "rimeligst", "koster minst", "minst mulig", "ikke dyrt", "ikke så dyrt", "pris er viktig", "spare penger", "budsj", "lavest pris", "ikke mye penger", "dritdyrt", "for dyrt", "dyrt"]);
-}
-
-// Brukeren er usikker på diagnosen — bruker "tror", "kanskje", "hva hvis" etc.
-function isHedging(m: string): boolean {
-  return matchAny(m, ["tror jeg", "tror det", "kanskje", "muligens", "ikke sikker", "ikke helt sikker", "hva hvis", "hvis det ikke", "hva om", "kan det være", "kan være", "vet ikke om"]);
-}
-
-// Brukeren er redd for å betale for noe de ikke trenger
-function isPriceConcern(m: string): boolean {
-  return matchAny(m, [
-    "betale for", "betale 1", "betale 8", "betale 9", "betale hvis", "betale når",
-    "koster hvis", "koster når", "hva hvis det ikke er", "hvis det ikke er",
-    "må jeg betale", "må jeg likevel", "betaler jeg", "koster det likevel",
-    "hva koster", "koster uansett", "hvis det viser seg", "hva om det ikke",
-  ]);
-}
-
-async function route(message: string, history: ChatMessage[], config: ClinicConfig, clinicId: string): Promise<ChatResponse> {
-  const m = norm(message);
-  const urgent = isUrgent(m);
-
-  // 0) Tannekstraksjon-spørsmål — svar på spørsmålet FØRST
-  if (asksAboutExtraction(m)) {
-    const akuttPris = getServicePrice(config, "akutt", 890);
-    const times = await getAvailableSlots(clinicId, "akutt", todayStr());
-    const tomorrow = tomorrowStr();
-    const tomorrowTimes = times.length === 0 ? await getAvailableSlots(clinicId, "akutt", tomorrow) : [];
-    const hasTimes = times.length > 0;
-    const hasTomorrowTimes = tomorrowTimes.length > 0;
-
-    const timesBlock = hasTimes
-      ? `\n\n**Ledige tider i dag:**\n${times.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}`
-      : hasTomorrowTimes
-      ? `\n\n**Ledige tider ${tomorrowLabel()}:**\n${tomorrowTimes.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}`
-      : `\n\nVi anbefaler å ringe oss på ${config.contact.phone} så finner vi noe som passer.`;
-
-    return {
-      reply: `Nei, det er ikke sikkert du må trekke tannen 🙏 Veldig ofte kan vi redde den med **fylling** eller **rotfylling** — det avhenger av tilstanden, og det finner vi ut raskt med en undersøkelse.\n\nVi skjønner at det er ubehagelig. La oss ta en titt og gi deg svaret — det er viktig å handle raskt så vi har flest mulig alternativer.\n\n🦷 **Akuttkonsultasjon** (${formatNok(akuttPris)}, 30 min)${timesBlock}\n\nHvilken tid passer?`,
-      action: { type: "start_booking", serviceId: "akutt" },
-      suggestions: hasTimes ? times.slice(0, 3) : hasTomorrowTimes ? tomorrowTimes.slice(0, 3) : ["Ring oss"],
-    };
-  }
-
-  // 0b) Frykt og angst — ro ned, svar på om det gjør vondt
-  if (isFearful(m)) {
-    const times = await getAvailableSlots(clinicId, "akutt", todayStr());
-    const tomorrow = tomorrowStr();
-    const tomorrowTimes = times.length === 0 ? await getAvailableSlots(clinicId, "akutt", tomorrow) : [];
-    const hasTimes = times.length > 0;
-    const hasTomorrowTimes = tomorrowTimes.length > 0;
-
-    const timesBlock = hasTimes
-      ? `\n\n**Ledige tider i dag:**\n${times.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}`
-      : hasTomorrowTimes
-      ? `\n\n**Ledige tider ${tomorrowLabel()}:**\n${tomorrowTimes.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}`
-      : "";
-
-    return {
-      reply: `Det er helt forståelig at du er nervøs — tannlegeskrekk er veldig vanlig 😊\n\nSelve behandlingen gjør **ikke vondt**. Vi bruker lokalbedøvelse som gjør området helt numment før vi starter. Du vil kanskje kjenne litt trykk, men ikke smerte. Og hvis du kjenner noe som helst — si ifra, så stopper vi.\n\nDe fleste som er redde sier etterpå at det gikk mye bedre enn de trodde. Vi tar godt vare på deg 🙏${timesBlock}\n\nVil du booke en time?`,
-      action: { type: "start_booking", serviceId: "akutt" },
-      suggestions: hasTimes ? [...times.slice(0, 2), "Mer info"] : hasTomorrowTimes ? [...tomorrowTimes.slice(0, 2), "Ring oss"] : ["Ring oss", "Mer info", "Åpningstider"],
-    };
-  }
-
-  // 0c-pre) Prisbekymring — svar direkte på spørsmålet FØR alt annet
-  if (isPriceConcern(m)) {
-    const undersokelsePris = getServicePrice(config, "undersokelse", 790);
-    // Finn hva boten anbefalte sist (fra historikken)
-    const lastBotMsg = history.filter(h => h.role === "assistant").slice(-1)[0]?.content ?? "";
-    const mentionedFyllning = lastBotMsg.toLowerCase().includes("fyllning") || lastBotMsg.toLowerCase().includes("fyllning");
-    const mentionedAkutt = lastBotMsg.toLowerCase().includes("akuttkonsultasjon");
-
-    const treatmentRef = mentionedFyllning
-      ? "fyllning"
-      : mentionedAkutt
-      ? "akuttkonsultasjon"
-      : "den behandlingen";
-
-    return {
-      reply: `Nei, du betaler **bare for det som faktisk gjøres** 🙏\n\nVis det ikke er ${treatmentRef}, betaler du ikke for det. Vi starter alltid med en **undersøkelse** (${formatNok(undersokelsePris)}, 45 min) der tannlegen finner ut nøyaktig hva som er galt — og du får vite prisen **før** vi gjør noe som helst.\n\nIngen overraskelser. Vi sier alltid fra først.\n\nVil du starte med en undersøkelse?`,
-      action: { type: "start_booking", serviceId: "undersokelse" },
-      suggestions: ["Book undersøkelse", "Hva koster undersøkelsen?", "Fortell mer"],
-    };
-  }
-
-  // 0c) Usikker — gi to enkle valg, ikke bestem for dem
-  // Merk: "hull" alene er ikke nok til å ekskludere — hvis de er usikre, skal vi ikke konkludere
-  if (isUnsure(m) && !matchAny(m, ["vondt", "tannpine", "smerte", "verker", "blød"])) {
-    const undersokelsePris = getServicePrice(config, "undersokelse", 790);
-    const akuttPris = getServicePrice(config, "akutt", 890);
-    return {
-      reply: `Ingen problem! 😊 Her er to enkle alternativer — du velger hva som passer best:\n\n**1. Undersøkelse** (${formatNok(undersokelsePris)}, 45 min)\nPerfekt hvis du ikke har vondt akkurat nå. Vi tar røntgen og sjekker hele munnen, og forteller deg nøyaktig hva som eventuelt bør gjøres.\n\n**2. Akuttkonsultasjon** (${formatNok(akuttPris)}, 30 min)\nPerfekt hvis du har vondt eller noe haster — vi fokuserer på akkurat det som plager deg.\n\nHva høres riktig ut for deg?`,
-      suggestions: ["Book undersøkelse", "Book akuttkonsultasjon", "Fortell mer om forskjellen"],
-    };
-  }
-
-  // 0d) Vil ha billig løsning — hjelp dem å spare, men forklar hvorfor
-  if (wantsCheap(m)) {
-    const undersokelsePris = getServicePrice(config, "undersokelse", 790);
-    return {
-      reply: `Helt forståelig! 👍 Det rimeligste alternativet er vanligvis en **undersøkelse** (${formatNok(undersokelsePris)}, 45 min).\n\nGrunnen til at vi starter der: det gir oss et klart bilde av hva som faktisk trengs — og unngår at du betaler for mer enn nødvendig. Mange ganger er løsningen enklere (og billigere) enn man tror.\n\nVil du booke en undersøkelse?`,
-      action: { type: "start_booking", serviceId: "undersokelse" },
-      suggestions: ["Book undersøkelse", "Hva koster de andre tjenestene?", "Se alle priser"],
-    };
-  }
-
-  // 1) Symptom check
-  const symptom = matchSymptom(m, config);
-  if (symptom) {
-    // Ikke gjenta samme svar hvis boten allerede anbefalte denne tjenesten
-    const lastBotReply = history.filter(h => h.role === "assistant").slice(-1)[0]?.content ?? "";
-    const alreadyRecommended = lastBotReply.toLowerCase().includes(symptom.serviceId) ||
-      (symptom.serviceId === "fyllning" && lastBotReply.toLowerCase().includes("fyllning")) ||
-      (symptom.serviceId === "tannrens" && lastBotReply.toLowerCase().includes("tannrens")) ||
-      (symptom.serviceId === "akutt" && lastBotReply.toLowerCase().includes("akuttkonsultasjon"));
-
-    if (alreadyRecommended) {
-      // Brukeren stiller et nytt spørsmål etter at vi allerede anbefalte — svar på det nye
-      const undersokelsePris = getServicePrice(config, "undersokelse", 790);
-      return {
-        reply: `Forstår at du har spørsmål! 😊 La meg si det klart: **du betaler bare for det som faktisk gjøres**.\n\nHvis det viser seg at du ikke trenger ${symptom.serviceId === "fyllning" ? "fyllning" : "den behandlingen"}, betaler du heller ikke for det. Vi starter alltid med en **undersøkelse** (${formatNok(undersokelsePris)}) der tannlegen sier fra nøyaktig hva som trengs — og prisen — **før** noe gjøres.\n\nVil du booke en undersøkelse så vi finner ut av det?`,
-        action: { type: "start_booking", serviceId: "undersokelse" },
-        suggestions: ["Book undersøkelse", "Hva koster undersøkelsen?", "Jeg vil ringe dere"],
-      };
-    }
-
-    // Brukeren er usikker på symptomene — ikke hopp rett til behandling
-    if (isHedging(m) && symptom.urgency !== "akutt") {
-      const undersokelsePris = getServicePrice(config, "undersokelse", 790);
-      const serviceLabel = symptom.serviceId === "fyllning" ? "hull eller karies"
-        : symptom.serviceId === "tannrens" ? "tannkjøttproblemer"
-        : "det du beskriver";
-      return {
-        reply: `Det kan godt hende det er ${serviceLabel} — men vi kan ikke si det sikkert uten å se på det. 😊\n\nDet lureste er å starte med en **undersøkelse** (${formatNok(undersokelsePris)}, 45 min inkl. røntgen). Da vet vi nøyaktig hva som er galt, og du får en klar plan med pris **før** noe behandling settes i gang.\n\n**Du betaler bare for det som faktisk gjøres** — ingen overraskelser.\n\nVil du booke?`,
-        action: { type: "start_booking", serviceId: "undersokelse" },
-        suggestions: ["Book undersøkelse", "Hva koster det?", "Haster det litt?"],
-      };
-    }
-
-    if (urgent || symptom.urgency === "akutt") {
-      const times = await getAvailableSlots(clinicId, symptom.serviceId, todayStr());
-      if (times.length > 0) {
-        return {
-          reply: `${symptom.reply}\n\n**Ledige tider i dag:**\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken tid passer?`,
-          action: { type: "start_booking", serviceId: symptom.serviceId },
-          suggestions: times,
-        };
-      }
-      // Ingen tider i dag — sjekk i morgen automatisk
-      const tomorrowTimes = await getAvailableSlots(clinicId, symptom.serviceId, tomorrowStr());
-      if (tomorrowTimes.length > 0) {
-        return {
-          reply: `${symptom.reply}\n\nVi har dessverre ikke ledig i dag, men **${tomorrowLabel()}** har vi disse tidene:\n${tomorrowTimes.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
-          action: { type: "start_booking", serviceId: symptom.serviceId },
-          suggestions: tomorrowTimes.slice(0, 3),
-        };
-      }
-      return {
-        reply: `${symptom.reply}\n\nVi har dessverre ikke ledig de nærmeste dagene. Ring oss direkte på ${config.contact.phone} — så prøver vi å klemme deg inn så fort som mulig.`,
-        action: { type: "start_booking", serviceId: symptom.serviceId },
-        suggestions: ["Ring oss", "Send e-post"],
-      };
-    }
-    // Ikke-akutt symptom: tilby valg haster/kan vente + spør om usikkerhet
-    if (symptom.urgency === "rutine") {
-      return {
-        reply: symptom.reply,
-        action: { type: "start_booking", serviceId: symptom.serviceId },
-        suggestions: symptom.suggestions,
-      };
-    }
-    // "snart" – gi valg mellom haster og kan vente
-    const undersokelsePris = getServicePrice(config, "undersokelse", 790);
-    return {
-      reply: `${symptom.reply}\n\n**Haster det, eller kan det vente litt?**\n• Haster → vi finner første ledige tid så fort som mulig\n• Kan vente → book en vanlig **undersøkelse** (${formatNok(undersokelsePris)}, 45 min) når det passer deg`,
-      action: { type: "start_booking", serviceId: symptom.serviceId },
-      suggestions: ["Det haster!", "Det kan vente litt", "Hva anbefaler dere?"],
-    };
-  }
-
-  // 1b) Oppfølging: "det haster" eller "det kan vente"
-  if (matchAny(m, ["det haster", "haster", "så fort som mulig", "snarest mulig"]) && !symptom) {
-    // Finn siste symptom fra historikk for å velge riktig service
-    const lastUserMsg = history.filter(h => h.role === "user").slice(-1)[0]?.content ?? "";
-    const prevSymptom = matchSymptom(norm(lastUserMsg), config);
-    const serviceId = prevSymptom?.serviceId ?? "akutt";
-    const times = await getAvailableSlots(clinicId, serviceId, todayStr());
-    if (times.length > 0) {
-      return {
-        reply: `Da finner vi deg en time så fort som mulig! 👍\n\n**Ledige tider i dag:**\n${times.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}\n\nHvilken tid passer?`,
-        action: { type: "start_booking", serviceId },
-        suggestions: times.slice(0, 3),
-      };
-    }
-    const tomorrowTimes = await getAvailableSlots(clinicId, serviceId, tomorrowStr());
-    if (tomorrowTimes.length > 0) {
-      return {
-        reply: `Ingen ledige tider i dag dessverre 😔 Men **${tomorrowLabel()}** har vi disse tidene:\n${tomorrowTimes.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
-        action: { type: "start_booking", serviceId },
-        suggestions: tomorrowTimes.slice(0, 3),
-      };
-    }
-    return {
-      reply: `Vi har dessverre ikke ledig de nærmeste dagene. Ring oss direkte på ${config.contact.phone} — vi prøver å klemme deg inn så fort som mulig.`,
-      suggestions: ["Ring oss", "Send e-post"],
-    };
-  }
-
-  if (matchAny(m, ["kan vente", "det kan vente", "ikke haster", "ingen hast", "når det passer"])) {
-    const undersokelsePris = getServicePrice(config, "undersokelse", 790);
-    return {
-      reply: `Bra! Da passer en **undersøkelse** perfekt (${formatNok(undersokelsePris)}, 45 min inkl. røntgen). Vi tar en grundig sjekk og gir deg en klar plan.\n\nNår ønsker du å komme?`,
-      action: { type: "start_booking", serviceId: "undersokelse" },
-      suggestions: ["Denne uken", "Neste uke", "Se ledige tider"],
-    };
-  }
-
-  // 2) Booking intent
-  if (
-    matchAny(m, ["book", "bestille", "bestill", "reservere", "sette opp", "time", "avtale", "ledig time", "ny time"]) &&
-    !matchAny(m, ["avbest", "avlys", "kansell", "flytte", "endre"])
-  ) {
-    const matchedService = config.services.find(s =>
-      m.includes(norm(s.name)) || m.includes(s.id)
-    );
-
-    if (urgent) {
-      const serviceId = matchedService?.id ?? (config.services[0]?.id ?? "");
-      const times = await getAvailableSlots(clinicId, serviceId, todayStr());
-      if (times.length > 0) {
-        return {
-          reply: `Ledige tider i dag:\n\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
-          action: { type: "start_booking", serviceId },
-          suggestions: times,
-        };
-      }
-      const tomorrowTimes = await getAvailableSlots(clinicId, serviceId, tomorrowStr());
-      if (tomorrowTimes.length > 0) {
-        return {
-          reply: `Ingen ledige tider i dag dessverre 😔\n\nMen **${tomorrowLabel()}** har vi disse tidene:\n${tomorrowTimes.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
-          action: { type: "start_booking", serviceId },
-          suggestions: tomorrowTimes.slice(0, 3),
-        };
-      }
-      return {
-        reply: `Ingen ledige tider de nærmeste dagene. Ring oss på ${config.contact.phone} så finner vi noe som passer.`,
-        action: { type: "start_booking", serviceId },
-        suggestions: ["Ring oss", "Send e-post"],
-      };
-    }
-
-    return {
-      reply: matchedService
-        ? `Jeg hjelper deg med **${matchedService.name}** (${formatNok(matchedService.priceNok)}, ${matchedService.durationMinutes} min). La oss finne en tid.`
-        : "Jeg hjelper deg å bestille time. Hva gjelder det — eller vil du bare ha første ledige?",
-      action: { type: "start_booking", serviceId: matchedService?.id },
-      suggestions: matchedService ? [] : ["Første ledige time", "Akuttkonsultasjon", "Undersøkelse", "Tannrens"],
-    };
-  }
-
-  // 2b) "Første ledige"
-  if (matchAny(m, ["første ledige", "første mulige", "når er dere ledig", "når har dere ledig"])) {
-    const serviceId = config.services[0]?.id ?? "";
-    const times = await getAvailableSlots(clinicId, serviceId, todayStr());
-    if (times.length > 0) {
-      return {
-        reply: `Første ledige tider i dag:\n\n${times.map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
-        action: { type: "start_booking", serviceId },
-        suggestions: times,
-      };
-    }
-    return {
-      reply: `Ingen ledige tider i dag. Ring oss på ${config.contact.phone} så finner vi noe som passer.`,
-      suggestions: ["Ring oss", "Se åpningstider"],
-    };
-  }
-
-  // 3) Cancellation
-  if (matchAny(m, ["avbest", "avlys", "kansell", "flytte time", "endre time"])) {
-    return {
-      reply: renderCancellation(config),
-      suggestions: ["Book ny time", "Åpningstider", "Priser"],
-    };
-  }
-
-  // 4) Opening hours
-  if (matchAny(m, ["åpningstid", "åpent", "stengt", "åpner", "stenger", "når har dere åpent"])) {
-    return {
-      reply: renderHours(config),
-      suggestions: ["Book time", "Se tjenester", "Adresse"],
-    };
-  }
-
-  // 5) Services & prices
-  if (matchAny(m, ["tjenest", "behandling", "pris", "koste", "kost", "hva koster", "tilbud", "oversikt"])) {
-    const matched = config.services.find(s =>
-      m.includes(norm(s.name)) || m.includes(s.id)
-    );
-    if (matched) {
-      return {
-        reply: `**${matched.name}**\n${matched.description}\n\n• Varighet: ${matched.durationMinutes} min\n• Pris: ${formatNok(matched.priceNok)}\n\nØnsker du å bestille?`,
-        suggestions: [`Book ${matched.name}`, "Se alle tjenester", "Åpningstider"],
-      };
-    }
-    return {
-      reply: renderServices(config),
-      suggestions: ["Book time", "Åpningstider", "Adresse"],
-    };
-  }
-
-  // 6) Address / contact
-  if (matchAny(m, ["adresse", "hvor ligger", "telefon", "kontakt", "e-post", "mail"])) {
-    return {
-      reply: renderContact(config),
-      suggestions: ["Åpningstider", "Book time", "Tjenester"],
-    };
-  }
-
-  // 7) Greetings
-  if (matchAny(m, ["hei", "hallo", "god dag", "god morgen", "halla", "heisann"])) {
-    return {
-      reply: `Hei! 👋 Jeg er her for deg – kan hjelpe med time, priser, symptomer og åpningstider.\n\nHva kan jeg gjøre for deg?`,
-      suggestions: ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"],
-    };
-  }
-
-  // 8) Thanks
-  if (matchAny(m, ["takk", "tusen takk", "ha det", "snakkes"])) {
-    return {
-      reply: "Bare hyggelig. Ta kontakt igjen når som helst 🦷",
-    };
-  }
-
-  // 9) Emergency
-  if (matchAny(m, ["nød", "akutt", "livstruende", "pustepro", "kraftig blød"])) {
-    return {
-      reply: "⚠️ **Ved livstruende tilstand, ring 113 umiddelbart.**\n\nVed tannlegevakt utenfor åpningstid, kontakt nærmeste tannlegevakt.\n\nHar du tannpine som ikke er livstruende? Jeg hjelper deg å booke en akuttkonsultasjon.",
-      suggestions: ["Book akuttkonsultasjon", "Åpningstider"],
-    };
-  }
-
-  // 10b) Recommendation request
-  if (matchAny(m, ["hva anbefaler", "hva mener du", "hva er best", "hva bør jeg gjøre", "hva bør jeg velge", "hva synes du"])) {
-    const undersokelsePris = getServicePrice(config, "undersokelse", 790);
-    return {
-      reply: `Mitt råd: start alltid med en **undersøkelse** (${formatNok(undersokelsePris)}, 45 min).\n\nGrunnen er enkel — vi kan ikke gi deg riktig behandling uten å vite nøyaktig hva som er galt. En undersøkelse gir oss full oversikt med røntgen, og du får en konkret plan du kan ta stilling til selv. Ingen overraskelser.\n\nVil du at jeg booker en?`,
-      action: { type: "start_booking", serviceId: "undersokelse" },
-      suggestions: ["Book undersøkelse", "Det haster faktisk", "Fortell mer"],
-    };
-  }
-
-  // 10) Identity
-  if (matchAny(m, ["hvem er du", "robot", "ai", "bot", "menneske", "ekte"])) {
-    return {
-      reply: "Jeg er SvarAI – en digital assistent som hjelper deg 24/7. Jeg kan svare på spørsmål, vurdere symptomer og booke time.\n\nFor kompliserte saker setter jeg deg direkte i kontakt med klinikken.",
-      suggestions: ["Book time", "Jeg har tannpine", "Snakk med oss"],
-    };
-  }
-
-  // 11) Human handoff
-  if (matchAny(m, ["snakk med", "vil ha menneske", "vil snakke med", "ekte person", "ringe", "ring oss", "kontakt dere", "send melding", "la meg snakke"])) {
-    return {
-      reply: `Selvfølgelig! Du kan nå oss direkte her:\n\n📞 **Telefon:** ${config.contact.phone}\n✉️ **E-post:** ${config.contact.email}\n\n${isOpenNow(config) ? "✅ Vi har åpent nå – ring oss gjerne!" : "🔒 Vi har stengt akkurat nå, men send en e-post så svarer vi så fort vi kan."}`,
-      suggestions: ["Book time i stedet", "Åpningstider"],
-    };
-  }
-
-  // 12) Smart fallback
-  const lastTopics = history
-    .filter(h => h.role === "user")
-    .map(h => norm(h.content))
-    .join(" ");
-
-  const fallbackCount = history
-    .filter(h => h.role === "assistant")
-    .filter(h => h.content.includes("Kan du si litt mer") || h.content.includes("Hva gjelder det"))
-    .length;
-
-  if (fallbackCount >= 2) {
-    return {
-      reply: `Jeg er ikke sikker på om jeg forstår hva du mener, og vil ikke gi deg feil svar. 🙏\n\nDu er velkommen til å ringe eller sende oss en e-post – da hjelper en av oss deg med en gang.\n\n📞 ${config.contact.phone}\n✉️ ${config.contact.email}`,
-      suggestions: ["Book time", "Åpningstider", "Priser"],
-    };
-  }
-
-  if (matchAny(lastTopics, ["book", "time", "bestill", "avtale"])) {
-    return {
-      reply: "Hvilken behandling gjelder det? Er det tannrens, undersøkelse, eller har du vondt et sted?",
-      suggestions: ["Tannrens", "Undersøkelse", "Jeg har tannpine", "Fyllning"],
-    };
-  }
-
-  if (matchAny(lastTopics, ["pris", "kost", "betale"])) {
-    return {
-      reply: "Hvilken behandling lurer du på prisen for? Jeg finner det med én gang.",
-      suggestions: ["Tannrens", "Fyllning", "Undersøkelse", "Tannuttrekking"],
-    };
-  }
-
-  if (matchAny(m, ["tann", "munn", "kjeve", "gom", "leppe", "bite", "tygge"])) {
-    return {
-      reply: "Det høres ut som du har et spørsmål om tannen din. Kan du beskrive litt mer hva du kjenner – er det smerte, følsomhet, eller noe annet?",
-      suggestions: ["Det gjør vondt", "Følsomt for kaldt", "Noe løst eller brukket", "Blødende tannkjøtt"],
-    };
-  }
-
+function fallbackResponse(config: ClinicConfig): ChatResponse {
   return {
-    reply: "Hva gjelder det? Jeg hjelper gjerne med time, priser, åpningstider eller symptomer. Eller si \"snakk med oss\" om du vil ringe/sende e-post.",
-    suggestions: ["Jeg har tannpine", "Book time", "Se priser", "Snakk med oss"],
+    reply: `Beklager, jeg har tekniske problemer akkurat nå. 🙏\n\nRing oss direkte på **${config.contact.phone}** eller send e-post til **${config.contact.email}** — vi hjelper deg med en gang!`,
+    suggestions: ["Ring oss", "Send e-post"],
     unanswered: true,
   };
 }
+
+// ── POST handler ───────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
@@ -651,9 +218,32 @@ export async function POST(req: NextRequest) {
     }
 
     const config = await getClinicData(clinicId);
-    const response = await route(message, history, config, clinicId);
 
-    // Lagre samtale i Supabase (asynkront, blokkerer ikke svaret)
+    // Hent ledige tider parallelt for de to vanligste tjenestene
+    const today = todayStr();
+    const tomorrow = tomorrowStr();
+    const mainServices = config.services.slice(0, 4).map(s => s.id);
+
+    const [todayResults, tomorrowResults] = await Promise.all([
+      Promise.all(mainServices.map(id => getAvailableSlots(clinicId, id, today).then(slots => ({ id, slots })))),
+      Promise.all(mainServices.map(id => getAvailableSlots(clinicId, id, tomorrow).then(slots => ({ id, slots })))),
+    ]);
+
+    const todaySlots = Object.fromEntries(todayResults.map(r => [r.id, r.slots]));
+    const tomorrowSlots = Object.fromEntries(tomorrowResults.map(r => [r.id, r.slots]));
+
+    const systemPrompt = buildSystemPrompt(config, todaySlots, tomorrowSlots);
+
+    // Kall Claude — fallback til enkel feilmelding hvis API er nede
+    let response: ChatResponse;
+    try {
+      response = await callClaude(systemPrompt, history, message);
+    } catch (err) {
+      console.error("Claude API feil:", err);
+      response = fallbackResponse(config);
+    }
+
+    // Lagre samtale i Supabase (asynkront)
     if (sessionId && isSupabaseConfigured()) {
       const updatedMessages = [
         ...history,
@@ -665,7 +255,7 @@ export async function POST(req: NextRequest) {
         session_id: sessionId,
         messages: updatedMessages,
         has_unanswered: response.unanswered === true,
-      }).catch(() => {}); // stille feil — logging skal ikke krasje chat
+      }).catch(() => {});
     }
 
     return NextResponse.json(response);
