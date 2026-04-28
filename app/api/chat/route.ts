@@ -219,6 +219,29 @@ function asksAboutExtraction(m: string): boolean {
   return matchAny(m, ["trekke tann", "trekkes", "dra ut", "fjerne tann", "må trekke", "trenge trekk", "ta ut tann"]);
 }
 
+function isUnsure(m: string): boolean {
+  return matchAny(m, ["vet ikke", "usikker", "ikke sikker", "ikke helt sikker", "ikke sikker på", "vet ikke hva", "vet ikke helt", "vet egentlig ikke", "vanskelig å si", "ingen anelse"]);
+}
+
+function wantsCheap(m: string): boolean {
+  return matchAny(m, ["billig", "billigst", "rimelig", "rimeligst", "koster minst", "minst mulig", "ikke dyrt", "ikke så dyrt", "pris er viktig", "spare penger", "budsj", "lavest pris", "ikke mye penger", "dritdyrt", "for dyrt", "dyrt"]);
+}
+
+// Brukeren er usikker på diagnosen — bruker "tror", "kanskje", "hva hvis" etc.
+function isHedging(m: string): boolean {
+  return matchAny(m, ["tror jeg", "tror det", "kanskje", "muligens", "ikke sikker", "ikke helt sikker", "hva hvis", "hvis det ikke", "hva om", "kan det være", "kan være", "vet ikke om"]);
+}
+
+// Brukeren er redd for å betale for noe de ikke trenger
+function isPriceConcern(m: string): boolean {
+  return matchAny(m, [
+    "betale for", "betale 1", "betale 8", "betale 9", "betale hvis", "betale når",
+    "koster hvis", "koster når", "hva hvis det ikke er", "hvis det ikke er",
+    "må jeg betale", "må jeg likevel", "betaler jeg", "koster det likevel",
+    "hva koster", "koster uansett", "hvis det viser seg", "hva om det ikke",
+  ]);
+}
+
 async function route(message: string, history: ChatMessage[], config: ClinicConfig, clinicId: string): Promise<ChatResponse> {
   const m = norm(message);
   const urgent = isUrgent(m);
@@ -266,9 +289,81 @@ async function route(message: string, history: ChatMessage[], config: ClinicConf
     };
   }
 
+  // 0c-pre) Prisbekymring — svar direkte på spørsmålet FØR alt annet
+  if (isPriceConcern(m)) {
+    const undersokelsePris = getServicePrice(config, "undersokelse", 790);
+    // Finn hva boten anbefalte sist (fra historikken)
+    const lastBotMsg = history.filter(h => h.role === "assistant").slice(-1)[0]?.content ?? "";
+    const mentionedFyllning = lastBotMsg.toLowerCase().includes("fyllning") || lastBotMsg.toLowerCase().includes("fyllning");
+    const mentionedAkutt = lastBotMsg.toLowerCase().includes("akuttkonsultasjon");
+
+    const treatmentRef = mentionedFyllning
+      ? "fyllning"
+      : mentionedAkutt
+      ? "akuttkonsultasjon"
+      : "den behandlingen";
+
+    return {
+      reply: `Nei, du betaler **bare for det som faktisk gjøres** 🙏\n\nVis det ikke er ${treatmentRef}, betaler du ikke for det. Vi starter alltid med en **undersøkelse** (${formatNok(undersokelsePris)}, 45 min) der tannlegen finner ut nøyaktig hva som er galt — og du får vite prisen **før** vi gjør noe som helst.\n\nIngen overraskelser. Vi sier alltid fra først.\n\nVil du starte med en undersøkelse?`,
+      action: { type: "start_booking", serviceId: "undersokelse" },
+      suggestions: ["Book undersøkelse", "Hva koster undersøkelsen?", "Fortell mer"],
+    };
+  }
+
+  // 0c) Usikker — gi to enkle valg, ikke bestem for dem
+  // Merk: "hull" alene er ikke nok til å ekskludere — hvis de er usikre, skal vi ikke konkludere
+  if (isUnsure(m) && !matchAny(m, ["vondt", "tannpine", "smerte", "verker", "blød"])) {
+    const undersokelsePris = getServicePrice(config, "undersokelse", 790);
+    const akuttPris = getServicePrice(config, "akutt", 890);
+    return {
+      reply: `Ingen problem! 😊 Her er to enkle alternativer — du velger hva som passer best:\n\n**1. Undersøkelse** (${formatNok(undersokelsePris)}, 45 min)\nPerfekt hvis du ikke har vondt akkurat nå. Vi tar røntgen og sjekker hele munnen, og forteller deg nøyaktig hva som eventuelt bør gjøres.\n\n**2. Akuttkonsultasjon** (${formatNok(akuttPris)}, 30 min)\nPerfekt hvis du har vondt eller noe haster — vi fokuserer på akkurat det som plager deg.\n\nHva høres riktig ut for deg?`,
+      suggestions: ["Book undersøkelse", "Book akuttkonsultasjon", "Fortell mer om forskjellen"],
+    };
+  }
+
+  // 0d) Vil ha billig løsning — hjelp dem å spare, men forklar hvorfor
+  if (wantsCheap(m)) {
+    const undersokelsePris = getServicePrice(config, "undersokelse", 790);
+    return {
+      reply: `Helt forståelig! 👍 Det rimeligste alternativet er vanligvis en **undersøkelse** (${formatNok(undersokelsePris)}, 45 min).\n\nGrunnen til at vi starter der: det gir oss et klart bilde av hva som faktisk trengs — og unngår at du betaler for mer enn nødvendig. Mange ganger er løsningen enklere (og billigere) enn man tror.\n\nVil du booke en undersøkelse?`,
+      action: { type: "start_booking", serviceId: "undersokelse" },
+      suggestions: ["Book undersøkelse", "Hva koster de andre tjenestene?", "Se alle priser"],
+    };
+  }
+
   // 1) Symptom check
   const symptom = matchSymptom(m, config);
   if (symptom) {
+    // Ikke gjenta samme svar hvis boten allerede anbefalte denne tjenesten
+    const lastBotReply = history.filter(h => h.role === "assistant").slice(-1)[0]?.content ?? "";
+    const alreadyRecommended = lastBotReply.toLowerCase().includes(symptom.serviceId) ||
+      (symptom.serviceId === "fyllning" && lastBotReply.toLowerCase().includes("fyllning")) ||
+      (symptom.serviceId === "tannrens" && lastBotReply.toLowerCase().includes("tannrens")) ||
+      (symptom.serviceId === "akutt" && lastBotReply.toLowerCase().includes("akuttkonsultasjon"));
+
+    if (alreadyRecommended) {
+      // Brukeren stiller et nytt spørsmål etter at vi allerede anbefalte — svar på det nye
+      const undersokelsePris = getServicePrice(config, "undersokelse", 790);
+      return {
+        reply: `Forstår at du har spørsmål! 😊 La meg si det klart: **du betaler bare for det som faktisk gjøres**.\n\nHvis det viser seg at du ikke trenger ${symptom.serviceId === "fyllning" ? "fyllning" : "den behandlingen"}, betaler du heller ikke for det. Vi starter alltid med en **undersøkelse** (${formatNok(undersokelsePris)}) der tannlegen sier fra nøyaktig hva som trengs — og prisen — **før** noe gjøres.\n\nVil du booke en undersøkelse så vi finner ut av det?`,
+        action: { type: "start_booking", serviceId: "undersokelse" },
+        suggestions: ["Book undersøkelse", "Hva koster undersøkelsen?", "Jeg vil ringe dere"],
+      };
+    }
+
+    // Brukeren er usikker på symptomene — ikke hopp rett til behandling
+    if (isHedging(m) && symptom.urgency !== "akutt") {
+      const undersokelsePris = getServicePrice(config, "undersokelse", 790);
+      const serviceLabel = symptom.serviceId === "fyllning" ? "hull eller karies"
+        : symptom.serviceId === "tannrens" ? "tannkjøttproblemer"
+        : "det du beskriver";
+      return {
+        reply: `Det kan godt hende det er ${serviceLabel} — men vi kan ikke si det sikkert uten å se på det. 😊\n\nDet lureste er å starte med en **undersøkelse** (${formatNok(undersokelsePris)}, 45 min inkl. røntgen). Da vet vi nøyaktig hva som er galt, og du får en klar plan med pris **før** noe behandling settes i gang.\n\n**Du betaler bare for det som faktisk gjøres** — ingen overraskelser.\n\nVil du booke?`,
+        action: { type: "start_booking", serviceId: "undersokelse" },
+        suggestions: ["Book undersøkelse", "Hva koster det?", "Haster det litt?"],
+      };
+    }
+
     if (urgent || symptom.urgency === "akutt") {
       const times = await getAvailableSlots(clinicId, symptom.serviceId, todayStr());
       if (times.length > 0) {
@@ -293,10 +388,57 @@ async function route(message: string, history: ChatMessage[], config: ClinicConf
         suggestions: ["Ring oss", "Send e-post"],
       };
     }
+    // Ikke-akutt symptom: tilby valg haster/kan vente + spør om usikkerhet
+    if (symptom.urgency === "rutine") {
+      return {
+        reply: symptom.reply,
+        action: { type: "start_booking", serviceId: symptom.serviceId },
+        suggestions: symptom.suggestions,
+      };
+    }
+    // "snart" – gi valg mellom haster og kan vente
+    const undersokelsePris = getServicePrice(config, "undersokelse", 790);
     return {
-      reply: symptom.reply,
+      reply: `${symptom.reply}\n\n**Haster det, eller kan det vente litt?**\n• Haster → vi finner første ledige tid så fort som mulig\n• Kan vente → book en vanlig **undersøkelse** (${formatNok(undersokelsePris)}, 45 min) når det passer deg`,
       action: { type: "start_booking", serviceId: symptom.serviceId },
-      suggestions: symptom.suggestions,
+      suggestions: ["Det haster!", "Det kan vente litt", "Hva anbefaler dere?"],
+    };
+  }
+
+  // 1b) Oppfølging: "det haster" eller "det kan vente"
+  if (matchAny(m, ["det haster", "haster", "så fort som mulig", "snarest mulig"]) && !symptom) {
+    // Finn siste symptom fra historikk for å velge riktig service
+    const lastUserMsg = history.filter(h => h.role === "user").slice(-1)[0]?.content ?? "";
+    const prevSymptom = matchSymptom(norm(lastUserMsg), config);
+    const serviceId = prevSymptom?.serviceId ?? "akutt";
+    const times = await getAvailableSlots(clinicId, serviceId, todayStr());
+    if (times.length > 0) {
+      return {
+        reply: `Da finner vi deg en time så fort som mulig! 👍\n\n**Ledige tider i dag:**\n${times.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}\n\nHvilken tid passer?`,
+        action: { type: "start_booking", serviceId },
+        suggestions: times.slice(0, 3),
+      };
+    }
+    const tomorrowTimes = await getAvailableSlots(clinicId, serviceId, tomorrowStr());
+    if (tomorrowTimes.length > 0) {
+      return {
+        reply: `Ingen ledige tider i dag dessverre 😔 Men **${tomorrowLabel()}** har vi disse tidene:\n${tomorrowTimes.slice(0, 3).map(t => `• kl. ${t}`).join("\n")}\n\nHvilken passer?`,
+        action: { type: "start_booking", serviceId },
+        suggestions: tomorrowTimes.slice(0, 3),
+      };
+    }
+    return {
+      reply: `Vi har dessverre ikke ledig de nærmeste dagene. Ring oss direkte på ${config.contact.phone} — vi prøver å klemme deg inn så fort som mulig.`,
+      suggestions: ["Ring oss", "Send e-post"],
+    };
+  }
+
+  if (matchAny(m, ["kan vente", "det kan vente", "ikke haster", "ingen hast", "når det passer"])) {
+    const undersokelsePris = getServicePrice(config, "undersokelse", 790);
+    return {
+      reply: `Bra! Da passer en **undersøkelse** perfekt (${formatNok(undersokelsePris)}, 45 min inkl. røntgen). Vi tar en grundig sjekk og gir deg en klar plan.\n\nNår ønsker du å komme?`,
+      action: { type: "start_booking", serviceId: "undersokelse" },
+      suggestions: ["Denne uken", "Neste uke", "Se ledige tider"],
     };
   }
 
@@ -421,6 +563,16 @@ async function route(message: string, history: ChatMessage[], config: ClinicConf
     return {
       reply: "⚠️ **Ved livstruende tilstand, ring 113 umiddelbart.**\n\nVed tannlegevakt utenfor åpningstid, kontakt nærmeste tannlegevakt.\n\nHar du tannpine som ikke er livstruende? Jeg hjelper deg å booke en akuttkonsultasjon.",
       suggestions: ["Book akuttkonsultasjon", "Åpningstider"],
+    };
+  }
+
+  // 10b) Recommendation request
+  if (matchAny(m, ["hva anbefaler", "hva mener du", "hva er best", "hva bør jeg gjøre", "hva bør jeg velge", "hva synes du"])) {
+    const undersokelsePris = getServicePrice(config, "undersokelse", 790);
+    return {
+      reply: `Mitt råd: start alltid med en **undersøkelse** (${formatNok(undersokelsePris)}, 45 min).\n\nGrunnen er enkel — vi kan ikke gi deg riktig behandling uten å vite nøyaktig hva som er galt. En undersøkelse gir oss full oversikt med røntgen, og du får en konkret plan du kan ta stilling til selv. Ingen overraskelser.\n\nVil du at jeg booker en?`,
+      action: { type: "start_booking", serviceId: "undersokelse" },
+      suggestions: ["Book undersøkelse", "Det haster faktisk", "Fortell mer"],
     };
   }
 
