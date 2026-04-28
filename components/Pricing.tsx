@@ -65,7 +65,7 @@ export default function Pricing() {
             Enkelt og forutsigbart – ingen bindingstid.
           </h2>
           <p className="mt-5 text-lg text-ink-600 leading-relaxed">
-            Start gratis i 14 dager. Ingen kredittkort nødvendig. Avslutter du innen prøveperioden betaler du ingenting.
+            14 dagers gratis prøveperiode. Betaling starter automatisk etterpå — avbestill når som helst.
           </p>
         </div>
 
@@ -153,7 +153,7 @@ export default function Pricing() {
 
         <p className="mt-6 text-sm text-ink-500">
           Alle priser er ekskl. mva. Spørsmål?{" "}
-          <a href="mailto:Markus08aasheim@gmail.com" className="text-brand-700 hover:underline">
+          <a href="mailto:hei@svarai.no" className="text-brand-700 hover:underline">
             Ta kontakt med oss
           </a>
           .

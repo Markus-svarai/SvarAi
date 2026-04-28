@@ -56,6 +56,86 @@ async function sendEmail(to: string, subject: string, html: string) {
   }).catch(err => console.error("[webhook] e-post feil:", err));
 }
 
+async function getClinicForWelcome(clinicId: string): Promise<{ name: string; contact_email: string; admin_password: string } | null> {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/clinics?id=eq.${encodeURIComponent(clinicId)}&select=name,contact_email,admin_password&limit=1`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+    );
+    const rows = await res.json();
+    return rows?.[0] ?? null;
+  } catch { return null; }
+}
+
+async function sendActivationEmail(clinic: { name: string; contact_email: string; admin_password: string }, clinicId: string, isTrial: boolean) {
+  const adminUrl = `https://svarai.no/admin?clinicId=${encodeURIComponent(clinicId)}`;
+  const widgetUrl = `https://svarai.no/widget?id=${clinicId}`;
+  const embedCode = `&lt;iframe\n  src="https://svarai.no/widget?id=${clinicId}"\n  width="420" height="620"\n  frameborder="0"\n  style="border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);"\n&gt;&lt;/iframe&gt;`;
+  const subject = isTrial
+    ? `Prøveperioden din har startet – ${clinic.name}`
+    : `Abonnementet er aktivert – ${clinic.name}`;
+  const headline = isTrial
+    ? `14 dager gratis starter nå`
+    : `AI-resepsjonisten din er aktiv`;
+  const intro = isTrial
+    ? `Prøveperioden din har startet. Du har 14 dager gratis, deretter 1 490 kr/mnd. Avbestill når som helst i admin-panelet.`
+    : `Betalingen er bekreftet og AI-resepsjonisten din er klar til bruk.`;
+
+  await sendEmail(
+    clinic.contact_email,
+    subject,
+    `<div style="font-family: system-ui, sans-serif; max-width: 520px; color: #111;">
+      <div style="background: #111827; border-radius: 12px 12px 0 0; padding: 20px 28px;">
+        <span style="font-size: 18px; font-weight: 700; color: #fff;">SvarAI</span>
+      </div>
+      <div style="border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px; padding: 28px;">
+        <h2 style="margin: 0 0 6px; font-size: 20px; color: #111827;">${headline}</h2>
+        <p style="color: #6b7280; margin: 0 0 24px; font-size: 14px;">${intro}</p>
+
+        <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px; padding: 18px; margin-bottom: 24px;">
+          <p style="font-weight: 700; margin: 0 0 10px; color: #92400e; font-size: 13px;">Innloggingsdetaljer</p>
+          <table style="font-size: 13px; width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 4px 14px 4px 0; color: #78350f; font-weight: 600; width: 100px;">Admin-panel</td>
+              <td><a href="${adminUrl}" style="color: #1a1a2e; font-size: 12px;">${adminUrl}</a></td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 14px 4px 0; color: #78350f; font-weight: 600;">Klinikk-ID</td>
+              <td><code style="background: #fff; border: 1px solid #fcd34d; border-radius: 4px; padding: 2px 8px; font-family: monospace;">${clinicId}</code></td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 14px 4px 0; color: #78350f; font-weight: 600;">Passord</td>
+              <td><code style="background: #fff; border: 1px solid #fcd34d; border-radius: 4px; padding: 2px 8px; font-family: monospace;">${clinic.admin_password}</code></td>
+            </tr>
+          </table>
+        </div>
+
+        <h3 style="font-size: 14px; font-weight: 600; color: #111827; margin: 0 0 10px;">Tre steg for å komme i gang</h3>
+        <ol style="padding-left: 18px; color: #374151; font-size: 14px; line-height: 1.9; margin: 0 0 24px;">
+          <li><a href="${adminUrl}" style="color: #1ea67e;">Logg inn i admin</a> og sjekk tjenester, priser og åpningstider</li>
+          <li><a href="${widgetUrl}" style="color: #1ea67e;">Test AI-chatten</a> som om du var en pasient</li>
+          <li>Kopier embed-koden og lim den inn på nettsiden din</li>
+        </ol>
+
+        <div style="background: #111827; border-radius: 10px; padding: 14px; margin-bottom: 24px;">
+          <p style="color: #9ca3af; font-size: 11px; margin: 0 0 6px;">Embed-kode — lim inn på nettsiden din, før &lt;/body&gt;</p>
+          <code style="color: #34d399; font-family: monospace; font-size: 11px; white-space: pre-wrap; display: block; line-height: 1.5;">${embedCode}</code>
+        </div>
+
+        <a href="${adminUrl}" style="display: inline-block; background: #1ea67e; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 14px;">
+          Gå til admin-panelet
+        </a>
+
+        <p style="font-size: 12px; color: #9ca3af; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 16px;">
+          Spørsmål? Svar på denne e-posten — vi hjelper deg.<br/>
+          SvarAI · <a href="https://svarai.no" style="color: #9ca3af;">svarai.no</a>
+        </p>
+      </div>
+    </div>`
+  );
+}
+
 // ── Webhook handler ────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -82,6 +162,7 @@ export async function POST(req: NextRequest) {
       const customerId  = obj.customer;
       const subsId      = obj.subscription;
       const email       = obj.customer_details?.email;
+      const hasTrial    = obj.subscription ? true : false; // trial startet via checkout
 
       if (clinicId) {
         await updateClinic(clinicId, {
@@ -89,16 +170,23 @@ export async function POST(req: NextRequest) {
           stripe_subscription_id: subsId,
           subscription_status:   "active",
         });
+
+        // Send full velkomst-e-post til klinikken
+        const clinic = await getClinicForWelcome(clinicId);
+        if (clinic) {
+          sendActivationEmail(clinic, clinicId, hasTrial).catch(() => {});
+        }
       }
 
       // Varsle Markus
       await sendEmail(
         NOTIFY_EMAIL,
-        `🎉 Ny betalende klinikk: ${clinicId}`,
+        `Ny betalende klinikk: ${clinicId}`,
         `<h2>Ny betalende klinikk!</h2>
          <p><strong>Klinikk-ID:</strong> ${clinicId}</p>
          <p><strong>E-post:</strong> ${email}</p>
-         <p><strong>Stripe customer:</strong> ${customerId}</p>`
+         <p><strong>Stripe customer:</strong> ${customerId}</p>
+         <p><strong>Prøveperiode:</strong> ${hasTrial ? "Ja (14 dager)" : "Nei"}</p>`
       );
       break;
     }

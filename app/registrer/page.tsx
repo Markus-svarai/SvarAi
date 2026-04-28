@@ -411,9 +411,9 @@ export default function RegistrerPage() {
                 <span className="text-indigo-500">💳</span> Aktiver abonnement
               </h3>
               <p className="text-sm text-slate-500 mb-1">
-                <strong className="text-slate-700">499 kr/mnd</strong> – fullt tilgang til SvarAI for klinikken din.
+                <strong className="text-slate-700">14 dager gratis</strong>, deretter <strong className="text-slate-700">1 490 kr/mnd</strong>.
               </p>
-              <p className="text-xs text-slate-400 mb-4">Betaling via Stripe. Avbestill når som helst.</p>
+              <p className="text-xs text-slate-400 mb-4">Betaling via Stripe. Ingen bindingstid – avbestill når som helst.</p>
               <button
                 onClick={async () => {
                   setCheckoutLoading(true);

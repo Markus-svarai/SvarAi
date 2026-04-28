@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
       "metadata[clinic_name]":       clinicName ?? clinicId,
       "success_url":                 `${BASE_URL}/takk?clinicId=${encodeURIComponent(clinicId)}`,
       "cancel_url":                  `${BASE_URL}/registrer?payment=cancelled`,
+      "subscription_data[trial_period_days]":   "14",
       "subscription_data[metadata][clinic_id]": clinicId,
     });
 

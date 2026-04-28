@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       },
       body: new URLSearchParams({
         customer:     customerId,
-        return_url:   `${BASE_URL}/admin`,
+        return_url:   `${BASE_URL}/admin?clinicId=${encodeURIComponent(clinicId)}`,
       }).toString(),
     });
 
