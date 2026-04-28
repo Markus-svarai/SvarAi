@@ -340,14 +340,14 @@ export default function WidgetPage() {
         body: JSON.stringify({ message: trimmed, history, clinicId, sessionId: sessionId.current }),
       });
       const data = await res.json();
-      addAssistantMessage(data.reply, data.suggestions);
 
       if (data.action?.type === "start_booking" && data.action.serviceId) {
-        const sid = data.action.serviceId as string;
-        setTimeout(() => {
-          setBooking({ ...INIT_BOOKING, step: "slots", serviceId: sid });
-          setSuggestions([]);
-        }, 500);
+        // Sett booking-steg og melding i samme render — ingen race condition
+        setMessages(prev => [...prev, { role: "assistant", text: data.reply }]);
+        setSuggestions([]);
+        setBooking({ ...INIT_BOOKING, step: "slots", serviceId: data.action.serviceId as string });
+      } else {
+        addAssistantMessage(data.reply, data.suggestions);
       }
     } catch {
       addAssistantMessage("Beklager, noe gikk galt. Prøv igjen.");
