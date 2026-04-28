@@ -286,11 +286,13 @@ export async function POST(req: NextRequest) {
         { role: "user", content: message },
         { role: "assistant", content: response.reply },
       ];
+      const isBookingTriggered = response.action?.type === "start_booking";
       upsertConversation({
         clinic_id: clinicId,
         session_id: sessionId,
         messages: updatedMessages,
         has_unanswered: response.unanswered === true,
+        ...(isBookingTriggered ? { ended_in_booking: true } : {}),
       }).catch(() => {});
     }
 

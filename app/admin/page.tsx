@@ -922,19 +922,15 @@ type Conversation = {
 
 // Hjelp: finn ubesvarte spørsmål fra samtaler
 function extractUnansweredQuestions(conversations: Conversation[]): { question: string; count: number }[] {
-  const FALLBACK_MARKER = "Hva gjelder det?";
   const counts: Record<string, number> = {};
 
   for (const c of conversations) {
     if (!c.has_unanswered) continue;
-    const msgs = c.messages;
-    for (let i = 1; i < msgs.length; i++) {
-      if (msgs[i].role === "assistant" && msgs[i].content.includes(FALLBACK_MARKER)) {
-        const userMsg = msgs[i - 1]?.content?.trim();
-        if (userMsg) {
-          counts[userMsg] = (counts[userMsg] ?? 0) + 1;
-        }
-      }
+    // Finn siste brukermelding — det er dette pasienten spurte om som ikke ble besvart
+    const userMessages = c.messages.filter(m => m.role === "user");
+    const lastUserMsg = userMessages[userMessages.length - 1]?.content?.trim();
+    if (lastUserMsg && lastUserMsg.length > 3) {
+      counts[lastUserMsg] = (counts[lastUserMsg] ?? 0) + 1;
     }
   }
 
