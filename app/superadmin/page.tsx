@@ -181,6 +181,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [openingClinic, setOpeningClinic] = useState<string | null>(null);
+  const [showDemo, setShowDemo] = useState(false);
 
   useEffect(() => {
     fetch(`/api/superadmin/clinics?token=${encodeURIComponent(token)}`)
@@ -212,17 +213,24 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
     }
   }
 
-  const filtered = clinics.filter(c =>
+  // Skill ut demo-klinikken slik at den ikke blander seg med ekte kunder
+  const DEMO_IDS = ["demo"];
+  const realClinics = clinics.filter(c => !DEMO_IDS.includes(c.id));
+  const demoClinics = clinics.filter(c => DEMO_IDS.includes(c.id));
+
+  const matchesSearch = (c: Clinic) =>
     !search ||
     c.name?.toLowerCase().includes(search.toLowerCase()) ||
     c.id?.toLowerCase().includes(search.toLowerCase()) ||
-    c.contact_email?.toLowerCase().includes(search.toLowerCase())
-  );
+    c.contact_email?.toLowerCase().includes(search.toLowerCase());
 
-  const active = clinics.filter(c => c.subscription_status === "active").length;
-  const inactive = clinics.filter(c => c.subscription_status === "inactive").length;
-  const totalBookings = clinics.reduce((s, c) => s + c.booking_count, 0);
-  const totalConversations = clinics.reduce((s, c) => s + (c.conversation_count ?? 0), 0);
+  const filtered = realClinics.filter(matchesSearch);
+  const filteredDemo = demoClinics.filter(matchesSearch);
+
+  const active = realClinics.filter(c => c.subscription_status === "active").length;
+  const inactive = realClinics.filter(c => c.subscription_status === "inactive").length;
+  const totalBookings = realClinics.reduce((s, c) => s + c.booking_count, 0);
+  const totalConversations = realClinics.reduce((s, c) => s + (c.conversation_count ?? 0), 0);
   const overallConvRate = totalConversations > 0
     ? Math.round((totalBookings / totalConversations) * 100)
     : null;
@@ -248,7 +256,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
         {/* KPI */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <div className="rounded-xl border border-ink-800 bg-ink-900 p-5 text-center">
-            <div className="text-3xl font-bold text-white">{clinics.length}</div>
+            <div className="text-3xl font-bold text-white">{realClinics.length}</div>
             <div className="text-xs text-ink-400 mt-1">Klinikker</div>
           </div>
           <div className="rounded-xl border border-green-900 bg-green-950 p-5 text-center">
@@ -287,25 +295,57 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
           </div>
         ) : error ? (
           <div className="text-sm text-red-400 bg-red-900/30 rounded-xl px-4 py-3 border border-red-800">{error}</div>
-        ) : filtered.length === 0 ? (
+        ) : filtered.length === 0 && filteredDemo.length === 0 ? (
           <div className="rounded-xl border border-dashed border-ink-700 py-12 text-center text-sm text-ink-500">
             {search ? "Ingen klinikker matcher søket." : "Ingen klinikker registrert ennå."}
           </div>
         ) : (
           <div className="space-y-3">
-            {/* Gruppering: Aktive først */}
-            {[
-              { label: "Aktive abonnement", filter: (c: Clinic) => c.subscription_status === "active" },
-              { label: "Ikke aktivert", filter: (c: Clinic) => c.subscription_status === "inactive" },
-              { label: "Avsluttet / betaling feilet", filter: (c: Clinic) => !["active","inactive"].includes(c.subscription_status) },
-            ].map(group => {
-              const rows = filtered.filter(group.filter);
-              if (rows.length === 0) return null;
-              return (
-                <div key={group.label}>
-                  <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2 mt-4">{group.label} ({rows.length})</p>
-                  <div className="space-y-2">
-                    {rows.map(c => (
+            {/* Ekte klinikker — gruppert */}
+            {filtered.length === 0 && !search ? (
+              <div className="rounded-xl border border-dashed border-ink-700 py-10 text-center text-sm text-ink-500">
+                Ingen kunder ennå — demo vises nedenfor.
+              </div>
+            ) : (
+              [
+                { label: "Aktive abonnement", filter: (c: Clinic) => c.subscription_status === "active" },
+                { label: "Ikke aktivert", filter: (c: Clinic) => c.subscription_status === "inactive" },
+                { label: "Avsluttet / betaling feilet", filter: (c: Clinic) => !["active","inactive"].includes(c.subscription_status) },
+              ].map(group => {
+                const rows = filtered.filter(group.filter);
+                if (rows.length === 0) return null;
+                return (
+                  <div key={group.label}>
+                    <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2 mt-4">{group.label} ({rows.length})</p>
+                    <div className="space-y-2">
+                      {rows.map(c => (
+                        <ClinicRow
+                          key={c.id}
+                          clinic={c}
+                          onOpen={() => openClinic(c.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
+            {/* Demo-seksjon — alltid sist, sammenslåbar */}
+            {filteredDemo.length > 0 && (
+              <div className="mt-8 pt-6 border-t border-ink-800">
+                <button
+                  onClick={() => setShowDemo(v => !v)}
+                  className="flex items-center gap-2 text-xs font-semibold text-ink-600 uppercase tracking-wider hover:text-ink-400 transition mb-3"
+                >
+                  <svg className={`w-3 h-3 transition-transform ${showDemo ? "rotate-90" : ""}`} fill="currentColor" viewBox="0 0 8 8">
+                    <path d="M2 1l4 3-4 3V1z"/>
+                  </svg>
+                  Demo-miljø ({filteredDemo.length})
+                </button>
+                {showDemo && (
+                  <div className="space-y-2 opacity-60">
+                    {filteredDemo.map(c => (
                       <ClinicRow
                         key={c.id}
                         clinic={c}
@@ -313,14 +353,14 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                       />
                     ))}
                   </div>
-                </div>
-              );
-            })}
+                )}
+              </div>
+            )}
           </div>
         )}
 
         {/* Inactive teller */}
-        {inactive > 0 && !loading && !search && (
+        {inactive > 0 && !loading && !search && realClinics.length > 0 && (
           <p className="mt-6 text-xs text-amber-500 text-center">
             {inactive} klinikk{inactive !== 1 ? "er" : ""} har ikke aktivert abonnement ennå
           </p>
