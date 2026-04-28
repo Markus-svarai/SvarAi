@@ -208,7 +208,7 @@ async function callClaude(
 
 function fallbackResponse(config: ClinicConfig): ChatResponse {
   return {
-    reply: `Beklager, jeg har tekniske problemer akkurat nå. 🙏\n\nRing oss direkte på **${config.contact.phone}** eller send e-post til **${config.contact.email}** — vi hjelper deg med en gang!`,
+    reply: `Beklager, jeg har tekniske problemer akkurat nå.\n\nRing oss direkte på **${config.contact.phone}** eller send e-post til **${config.contact.email}** — vi hjelper deg med en gang!`,
     suggestions: ["Ring oss", "Send e-post"],
     unanswered: true,
   };

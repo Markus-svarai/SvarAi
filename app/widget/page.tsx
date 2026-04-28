@@ -71,7 +71,7 @@ function SlotPicker({ clinicId, serviceId, brandColor, onSelect }: {
   }, [dayIndex, clinicId, serviceId, currentDay?.value]);
 
   return (
-    <div style={{
+    <div className="booking-panel" style={{
       background: "#f9fafb",
       borderTop: "1px solid #f0f0f0",
       padding: "14px 14px 10px",
@@ -204,7 +204,7 @@ function InfoForm({ date, time, dateLabel, brandColor, loading, onSubmit, onCanc
   };
 
   return (
-    <div style={{
+    <div className="booking-panel" style={{
       background: "#f9fafb",
       borderTop: "1px solid #f0f0f0",
       padding: "14px",
@@ -217,7 +217,10 @@ function InfoForm({ date, time, dateLabel, brandColor, loading, onSubmit, onCanc
         border: "1px solid #e5e7eb",
         fontSize: 12, color: "#374151",
       }}>
-        <span style={{ fontSize: 14 }}>📅</span>
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none" style={{ flexShrink: 0, color: "#6b7280" }}>
+          <rect x="3" y="4" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+          <path d="M7 2v4M13 2v4M3 9h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
         <span><strong>{dateLabel}</strong> kl. <strong>{time}</strong></span>
         <button
           onClick={onCancel}
@@ -388,7 +391,7 @@ export default function WidgetPage() {
       if (data.ok) {
         setBooking(b => ({ ...b, step: "done" }));
         addAssistantMessage(
-          `✅ **Timen er bestilt!**\n\n📅 ${booking.dateLabel} kl. ${booking.time}\n👤 ${name}\n\nKlinikken vil bekrefte timen. Ha en fin dag! 🦷`,
+          `**Timen er bestilt.**\n\n${booking.dateLabel} kl. ${booking.time}\n\nDu vil få en bekreftelse på e-post. Vi gleder oss til å se deg.`,
           ["Book en ny time", "Åpningstider"]
         );
       } else {
@@ -467,7 +470,7 @@ export default function WidgetPage() {
                 color: "white", fontWeight: 700, fontSize: 11, flexShrink: 0,
               }}>S</div>
             )}
-            <div style={{
+            <div className="msg-bubble" style={{
               maxWidth: "78%", padding: "9px 13px",
               borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
               background: msg.role === "user" ? "#111" : "#f4f4f5",
@@ -586,8 +589,23 @@ export default function WidgetPage() {
           0%, 100% { opacity: 0.3; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1); }
         }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
         * { box-sizing: border-box; }
         body { margin: 0; }
+        .booking-panel { animation: slideUp 0.22s ease; }
+        .msg-bubble { animation: fadeIn 0.18s ease; }
+        button { transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease; }
+        input:focus { outline: none; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
       `}</style>
     </div>
   );
