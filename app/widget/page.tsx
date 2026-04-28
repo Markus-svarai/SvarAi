@@ -305,9 +305,9 @@ export default function WidgetPage() {
     fetch(`/api/widget-check?id=${encodeURIComponent(clinicId)}`)
       .then(res => {
         if (!res.ok) setBlocked(true);
-        else addAssistantMessage("Hei! 👋 Jeg er den digitale resepsjonisten. Hva kan jeg hjelpe deg med?", ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]);
+        else addAssistantMessage("Hei! Jeg er resepsjonisten her. Hva kan jeg hjelpe deg med?", ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]);
       })
-      .catch(() => addAssistantMessage("Hei! 👋 Jeg er den digitale resepsjonisten. Hva kan jeg hjelpe deg med?", ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]));
+      .catch(() => addAssistantMessage("Hei! Jeg er resepsjonisten her. Hva kan jeg hjelpe deg med?", ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
