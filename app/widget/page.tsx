@@ -3,31 +3,37 @@
 import { useEffect, useRef, useState } from "react";
 
 type Message = { role: "user" | "assistant"; text: string };
-type BookingStep = "idle" | "date" | "time" | "name" | "phone" | "email" | "confirm" | "done";
 
-const AVAILABLE_TIMES = ["09:00", "10:00", "11:30", "13:00", "14:30", "15:30"];
+type BookingState = {
+  step: "idle" | "slots" | "info" | "done";
+  serviceId: string;
+  date: string;
+  dateLabel: string;
+  time: string;
+};
 
-function getTomorrowDate(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().split("T")[0];
-}
+const INIT_BOOKING: BookingState = {
+  step: "idle", serviceId: "", date: "", dateLabel: "", time: "",
+};
 
-function getNextDates(count = 5): { label: string; value: string }[] {
-  const dates: { label: string; value: string }[] = [];
-  const d = new Date();
-  for (let i = 1; dates.length < count; i++) {
-    const next = new Date(d);
-    next.setDate(d.getDate() + i);
-    const dow = next.getDay();
-    if (dow === 0 || dow === 6) continue; // skip weekends
-    dates.push({
-      label: next.toLocaleDateString("nb-NO", { weekday: "long", day: "numeric", month: "long" }),
-      value: next.toISOString().split("T")[0],
+// ── Dag-helpers ────────────────────────────────────────────────────────────
+
+function getUpcomingDays(count = 14) {
+  const days: { label: string; short: string; value: string }[] = [];
+  const today = new Date();
+  for (let i = 0; days.length < count; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    days.push({
+      label: d.toLocaleDateString("nb-NO", { weekday: "long", day: "numeric", month: "long" }),
+      short: i === 0 ? "I dag" : i === 1 ? "I morgen" : d.toLocaleDateString("nb-NO", { weekday: "short", day: "numeric", month: "short" }),
+      value: d.toLocaleDateString("sv-SE"),
     });
   }
-  return dates;
+  return days;
 }
+
+// ── Markdown ───────────────────────────────────────────────────────────────
 
 function renderMarkdown(text: string) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
@@ -38,70 +44,282 @@ function renderMarkdown(text: string) {
   );
 }
 
+// ── SlotPicker ─────────────────────────────────────────────────────────────
+
+function SlotPicker({ clinicId, serviceId, brandColor, onSelect }: {
+  clinicId: string;
+  serviceId: string;
+  brandColor: string;
+  onSelect: (date: string, time: string, dateLabel: string) => void;
+}) {
+  const days = getUpcomingDays();
+  const [dayIndex, setDayIndex] = useState(0);
+  const [slots, setSlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+
+  const currentDay = days[dayIndex];
+
+  useEffect(() => {
+    if (!currentDay) return;
+    setLoadingSlots(true);
+    setSlots([]);
+    fetch(`/api/availability?clinicId=${encodeURIComponent(clinicId)}&serviceId=${encodeURIComponent(serviceId)}&date=${encodeURIComponent(currentDay.value)}`)
+      .then(r => r.json())
+      .then(data => setSlots((data.slots ?? []).map((s: { time: string }) => s.time)))
+      .catch(() => setSlots([]))
+      .finally(() => setLoadingSlots(false));
+  }, [dayIndex, clinicId, serviceId, currentDay?.value]);
+
+  return (
+    <div style={{
+      background: "#f9fafb",
+      borderTop: "1px solid #f0f0f0",
+      padding: "14px 14px 10px",
+    }}>
+      {/* Dag-navigator */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <button
+          onClick={() => setDayIndex(i => Math.max(0, i - 1))}
+          disabled={dayIndex === 0}
+          style={{
+            width: 32, height: 32, borderRadius: "50%",
+            border: "1px solid #e5e7eb",
+            background: dayIndex === 0 ? "#f9fafb" : "#fff",
+            color: dayIndex === 0 ? "#d1d5db" : "#374151",
+            cursor: dayIndex === 0 ? "default" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 14, fontWeight: 600,
+          }}
+        >‹</button>
+
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "#111" }}>{currentDay.short}</div>
+          <div style={{ fontSize: 11, color: "#9ca3af" }}>{currentDay.value}</div>
+        </div>
+
+        <button
+          onClick={() => setDayIndex(i => Math.min(days.length - 1, i + 1))}
+          disabled={dayIndex === days.length - 1}
+          style={{
+            width: 32, height: 32, borderRadius: "50%",
+            border: "1px solid #e5e7eb",
+            background: "#fff",
+            color: "#374151",
+            cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 14, fontWeight: 600,
+          }}
+        >›</button>
+      </div>
+
+      {/* Ledige tider */}
+      {loadingSlots ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: "12px 0" }}>
+          <div style={{
+            display: "flex", gap: 4, alignItems: "center",
+          }}>
+            {[0,1,2].map(i => (
+              <span key={i} style={{
+                width: 6, height: 6, borderRadius: "50%", background: "#9ca3af",
+                animation: "pulse 1.2s ease-in-out infinite",
+                animationDelay: `${i * 0.2}s`,
+              }} />
+            ))}
+          </div>
+        </div>
+      ) : slots.length === 0 ? (
+        <p style={{ textAlign: "center", fontSize: 12, color: "#9ca3af", margin: "8px 0" }}>
+          Ingen ledige tider denne dagen — prøv en annen dag
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {slots.map(time => (
+            <button
+              key={time}
+              onClick={() => onSelect(currentDay.value, time, currentDay.label)}
+              style={{
+                padding: "7px 14px",
+                borderRadius: 8,
+                border: `1.5px solid ${brandColor}`,
+                background: "#fff",
+                color: brandColor,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.1s",
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = brandColor;
+                (e.currentTarget as HTMLElement).style.color = "#fff";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = "#fff";
+                (e.currentTarget as HTMLElement).style.color = brandColor;
+              }}
+            >
+              {time}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── InfoForm ───────────────────────────────────────────────────────────────
+
+function InfoForm({ date, time, dateLabel, brandColor, loading, onSubmit, onCancel }: {
+  date: string;
+  time: string;
+  dateLabel: string;
+  brandColor: string;
+  loading: boolean;
+  onSubmit: (name: string, phone: string, email: string) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (name.trim().length < 2) return setError("Skriv inn fullt navn");
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 8) return setError("Skriv inn et gyldig telefonnummer (8 siffer)");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError("Skriv inn en gyldig e-postadresse");
+    onSubmit(name.trim(), phone.trim(), email.trim());
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "9px 12px",
+    borderRadius: 8,
+    border: "1px solid #e5e7eb",
+    fontSize: 13,
+    outline: "none",
+    background: "#fff",
+    boxSizing: "border-box",
+  };
+
+  return (
+    <div style={{
+      background: "#f9fafb",
+      borderTop: "1px solid #f0f0f0",
+      padding: "14px",
+    }}>
+      {/* Time summary */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 6,
+        marginBottom: 12, padding: "8px 12px",
+        background: "#fff", borderRadius: 8,
+        border: "1px solid #e5e7eb",
+        fontSize: 12, color: "#374151",
+      }}>
+        <span style={{ fontSize: 14 }}>📅</span>
+        <span><strong>{dateLabel}</strong> kl. <strong>{time}</strong></span>
+        <button
+          onClick={onCancel}
+          style={{ marginLeft: "auto", fontSize: 11, color: "#9ca3af", background: "none", border: "none", cursor: "pointer" }}
+        >
+          Endre tid
+        </button>
+      </div>
+
+      <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <input
+          placeholder="Fullt navn"
+          value={name}
+          onChange={e => { setName(e.target.value); setError(""); }}
+          style={inputStyle}
+          autoFocus
+        />
+        <input
+          placeholder="Telefonnummer"
+          type="tel"
+          value={phone}
+          onChange={e => { setPhone(e.target.value); setError(""); }}
+          style={inputStyle}
+        />
+        <input
+          placeholder="E-postadresse"
+          type="email"
+          value={email}
+          onChange={e => { setEmail(e.target.value); setError(""); }}
+          style={inputStyle}
+        />
+        {error && (
+          <p style={{ fontSize: 11, color: "#ef4444", margin: 0 }}>{error}</p>
+        )}
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: "10px",
+            borderRadius: 8,
+            border: "none",
+            background: loading ? "#e5e7eb" : brandColor,
+            color: loading ? "#9ca3af" : "#fff",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: loading ? "default" : "pointer",
+            transition: "background 0.15s",
+            marginTop: 2,
+          }}
+        >
+          {loading ? "Bestiller…" : "Bekreft booking →"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ── Main widget ────────────────────────────────────────────────────────────
+
 export default function WidgetPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>(["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]);
   const [blocked, setBlocked] = useState(false);
-
-  // Booking state
-  const [bookingStep, setBookingStep] = useState<BookingStep>("idle");
+  const [booking, setBooking] = useState<BookingState>(INIT_BOOKING);
   const [pendingServiceId, setPendingServiceId] = useState<string | null>(null);
-  const [bookingData, setBookingData] = useState<{
-    serviceId: string; date: string; time: string; name: string; phone: string; email: string;
-  }>({ serviceId: "", date: "", time: "", name: "", phone: "", email: "" });
+  const [bookingLoading, setBookingLoading] = useState(false);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
   const params = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search)
     : new URLSearchParams();
   const clinicId = params.get("id") ?? "demo";
-  const brandColor = "#" + (params.get("color") ?? "6c63ff");
+  const brandColor = "#" + (params.get("color") ?? "1ea67e");
 
-  // Unik sesjons-ID per chat-økt
   const sessionId = useRef<string>(
     typeof crypto !== "undefined"
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2)
   );
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // Check if this clinic has an active subscription
     fetch(`/api/widget-check?id=${encodeURIComponent(clinicId)}`)
       .then(res => {
-        if (!res.ok) {
-          setBlocked(true);
-        } else {
-          addAssistantMessage(
-            "Hei! 👋 Jeg er den digitale resepsjonisten. Hva kan jeg hjelpe deg med?",
-            ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]
-          );
-        }
+        if (!res.ok) setBlocked(true);
+        else addAssistantMessage("Hei! 👋 Jeg er den digitale resepsjonisten. Hva kan jeg hjelpe deg med?", ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]);
       })
-      .catch(() => {
-        // On network error, allow through (fail open — better UX than blocking)
-        addAssistantMessage(
-          "Hei! 👋 Jeg er den digitale resepsjonisten. Hva kan jeg hjelpe deg med?",
-          ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]
-        );
-      });
+      .catch(() => addAssistantMessage("Hei! 👋 Jeg er den digitale resepsjonisten. Hva kan jeg hjelpe deg med?", ["Jeg har tannpine", "Book time", "Åpningstider", "Priser"]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, loading]);
+  }, [messages, loading, booking.step]);
 
   function addAssistantMessage(text: string, sugg?: string[]) {
     setMessages(prev => [...prev, { role: "assistant", text }]);
-    if (sugg) setSuggestions(sugg);
-    else setSuggestions([]);
+    setSuggestions(sugg ?? []);
   }
 
   function addUserMessage(text: string) {
@@ -114,13 +332,6 @@ export default function WidgetPage() {
     const trimmed = text.trim();
     setInput("");
     addUserMessage(trimmed);
-
-    // Handle booking flow
-    if (bookingStep !== "idle" && bookingStep !== "done") {
-      await handleBookingInput(trimmed);
-      return;
-    }
-
     setLoading(true);
     try {
       const history = messages.map(m => ({ role: m.role, content: m.text }));
@@ -132,7 +343,6 @@ export default function WidgetPage() {
       const data = await res.json();
       addAssistantMessage(data.reply, data.suggestions);
 
-      // Start booking flow if action triggered
       if (data.action?.type === "start_booking" && data.action.serviceId) {
         setPendingServiceId(data.action.serviceId);
       }
@@ -143,128 +353,19 @@ export default function WidgetPage() {
     }
   }
 
-  function startBooking(serviceId: string) {
-    setBookingData(d => ({ ...d, serviceId }));
-    setBookingStep("date");
-    const dates = getNextDates();
-    const labels = dates.map(d => d.label);
-    addAssistantMessage(
-      "Velg dato for timen din:",
-      labels
-    );
-  }
-
-  async function handleBookingInput(input: string) {
-    switch (bookingStep) {
-      case "date": {
-        const dates = getNextDates();
-        const match = dates.find(d =>
-          d.label.toLowerCase().includes(input.toLowerCase()) ||
-          d.value === input
-        );
-        const chosenDate = match?.value ?? getTomorrowDate();
-        setBookingData(d => ({ ...d, date: chosenDate }));
-        setBookingStep("time");
-        addAssistantMessage(
-          `Ledige tider ${match?.label ?? input}:`,
-          AVAILABLE_TIMES
-        );
-        break;
-      }
-      case "time": {
-        const time = AVAILABLE_TIMES.includes(input) ? input : AVAILABLE_TIMES[0];
-        setBookingData(d => ({ ...d, time }));
-        setBookingStep("name");
-        addAssistantMessage("Hva er ditt fulle navn?");
-        break;
-      }
-      case "name": {
-        if (input.trim().length < 2) {
-          addAssistantMessage("Skriv inn fullt navn (minst 2 tegn).");
-          return;
-        }
-        setBookingData(d => ({ ...d, name: input.trim() }));
-        setBookingStep("phone");
-        addAssistantMessage("Hva er ditt telefonnummer?");
-        break;
-      }
-      case "phone": {
-        const digits = input.replace(/\D/g, "");
-        if (digits.length < 8) {
-          addAssistantMessage("Skriv inn et gyldig telefonnummer (8 siffer).");
-          return;
-        }
-        setBookingData(d => ({ ...d, phone: input.trim() }));
-        setBookingStep("email");
-        addAssistantMessage("Hva er din e-postadresse?");
-        break;
-      }
-      case "email": {
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input)) {
-          addAssistantMessage("Skriv inn en gyldig e-postadresse.");
-          return;
-        }
-        const finalData = { ...bookingData, email: input.trim() };
-        setBookingData(finalData);
-        setBookingStep("confirm");
-        addAssistantMessage(
-          `Her er en oppsummering av bestillingen din:\n\n📅 **Dato:** ${new Date(finalData.date + "T00:00:00").toLocaleDateString("nb-NO", { weekday: "long", day: "numeric", month: "long" })}\n🕐 **Tid:** kl. ${finalData.time}\n👤 **Navn:** ${finalData.name}\n📞 **Telefon:** ${finalData.phone}\n✉️ **E-post:** ${finalData.email}\n\nBekreft bestillingen?`,
-          ["Ja, bekreft", "Avbryt"]
-        );
-        break;
-      }
-      case "confirm": {
-        if (input.toLowerCase().includes("avbryt") || input.toLowerCase().includes("nei")) {
-          setBookingStep("idle");
-          setPendingServiceId(null);
-          addAssistantMessage("Bestillingen ble avbrutt. Kan jeg hjelpe deg med noe annet?", ["Book time", "Åpningstider", "Priser"]);
-          return;
-        }
-        // Submit booking
-        setLoading(true);
-        try {
-          const res = await fetch("/api/booking", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...bookingData, clinicId }),
-          });
-          const data = await res.json();
-          if (data.ok) {
-            setBookingStep("done");
-            addAssistantMessage(
-              `✅ **Timen er bestilt!**\n\nBookingnr: ${data.booking.id}\n\nKlinikken vil ringe deg på **${bookingData.phone}** for å bekrefte timen. Ha en fin dag! 🦷`,
-              ["Book en ny time", "Åpningstider"]
-            );
-          } else {
-            addAssistantMessage(`Beklager: ${data.error ?? "Noe gikk galt."}`, ["Prøv igjen", "Ring oss"]);
-            setBookingStep("idle");
-          }
-        } catch {
-          addAssistantMessage("Klarte ikke å sende bestillingen. Prøv igjen.", ["Prøv igjen"]);
-          setBookingStep("idle");
-        } finally {
-          setLoading(false);
-        }
-        break;
-      }
-    }
-  }
-
-  // When a "Book ..." suggestion is clicked after AI replies with booking action
   function handleSuggestionClick(s: string) {
     if (s === "Book en ny time") {
-      setBookingStep("idle");
+      setBooking(INIT_BOOKING);
       setPendingServiceId(null);
-      setBookingData({ serviceId: "", date: "", time: "", name: "", phone: "", email: "" });
       send("Book time");
       return;
     }
 
-    // If we just got a booking action and user clicks "Book akuttkonsultasjon" etc.
-    if (pendingServiceId && (s.toLowerCase().includes("book") || s.toLowerCase().includes("bestill"))) {
+    // Trigger slot picker if pending booking + book-click
+    if (pendingServiceId && (s.toLowerCase().includes("book") || s.toLowerCase().includes("bestill") || s.toLowerCase().includes("fortsett"))) {
       addUserMessage(s);
       setSuggestions([]);
-      startBooking(pendingServiceId);
+      setBooking({ ...INIT_BOOKING, step: "slots", serviceId: pendingServiceId });
       setPendingServiceId(null);
       return;
     }
@@ -272,92 +373,93 @@ export default function WidgetPage() {
     send(s);
   }
 
+  function handleSlotSelect(date: string, time: string, dateLabel: string) {
+    setBooking(b => ({ ...b, step: "info", date, time, dateLabel }));
+  }
+
+  async function handleInfoSubmit(name: string, phone: string, email: string) {
+    setBookingLoading(true);
+    try {
+      const res = await fetch("/api/booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          serviceId: booking.serviceId,
+          date: booking.date,
+          time: booking.time,
+          name, phone, email,
+          clinicId,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setBooking(b => ({ ...b, step: "done" }));
+        addAssistantMessage(
+          `✅ **Timen er bestilt!**\n\n📅 ${booking.dateLabel} kl. ${booking.time}\n👤 ${name}\n\nKlinikken vil bekrefte timen. Ha en fin dag! 🦷`,
+          ["Book en ny time", "Åpningstider"]
+        );
+      } else {
+        addAssistantMessage(`Beklager: ${data.error ?? "Noe gikk galt."} Prøv igjen.`, ["Prøv igjen", "Ring oss"]);
+        setBooking(INIT_BOOKING);
+      }
+    } catch {
+      addAssistantMessage("Klarte ikke å sende bestillingen. Prøv igjen.", ["Prøv igjen"]);
+      setBooking(INIT_BOOKING);
+    } finally {
+      setBookingLoading(false);
+    }
+  }
+
+  // When AI triggers booking and user hasn't clicked yet — auto-show slots
+  useEffect(() => {
+    if (pendingServiceId && !loading) {
+      // Small delay so the message renders first
+      const t = setTimeout(() => {
+        setBooking({ ...INIT_BOOKING, step: "slots", serviceId: pendingServiceId });
+        setPendingServiceId(null);
+        setSuggestions([]);
+      }, 400);
+      return () => clearTimeout(t);
+    }
+  }, [pendingServiceId, loading]);
+
   if (blocked) {
     return (
       <div style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        height: "100vh",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        background: "#ffffff",
-        padding: 24,
-        textAlign: "center",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        height: "100vh", fontFamily: "system-ui, -apple-system, sans-serif",
+        background: "#ffffff", padding: 24, textAlign: "center",
       }}>
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style={{ marginBottom: 16 }}>
-          <circle cx="12" cy="12" r="10" stroke="#d1d5db" strokeWidth="1.5"/>
-          <path d="M8 8l8 8M16 8l-8 8" stroke="#d1d5db" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
         <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>Chat er ikke tilgjengelig.</p>
         <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>Ta kontakt med klinikken direkte.</p>
       </div>
     );
   }
 
+  const showInput = booking.step === "idle" || booking.step === "done";
+
   return (
     <div style={{
-      display: "flex",
-      flexDirection: "column",
-      height: "100vh",
+      display: "flex", flexDirection: "column", height: "100vh",
       fontFamily: "system-ui, -apple-system, sans-serif",
-      background: "#ffffff",
-      overflow: "hidden",
+      background: "#ffffff", overflow: "hidden",
     }}>
       {/* Header */}
       <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "14px 16px 16px",
-        borderBottom: "1px solid #f0f0f0",
-        background: "#ffffff",
-        flexShrink: 0,
-        position: "relative",
-        overflow: "hidden",
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "14px 16px", borderBottom: "1px solid #f0f0f0",
+        background: "#ffffff", flexShrink: 0,
       }}>
-        <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} preserveAspectRatio="none" viewBox="0 0 400 56">
-          {[
-            { y: 10, opacity: 0.18, amp: 3 },
-            { y: 20, opacity: 0.13, amp: 4 },
-            { y: 30, opacity: 0.09, amp: 3 },
-            { y: 40, opacity: 0.05, amp: 2 },
-            { y: 50, opacity: 0.02, amp: 1.5 },
-          ].map((w, i) => (
-            <path
-              key={i}
-              d={`M0,${w.y} C50,${w.y - w.amp} 100,${w.y + w.amp} 150,${w.y} S250,${w.y - w.amp} 300,${w.y} S350,${w.y + w.amp} 400,${w.y}`}
-              fill="none"
-              stroke="#000"
-              strokeWidth="1"
-              opacity={w.opacity}
-            />
-          ))}
-        </svg>
         <div style={{
-          width: 36,
-          height: 36,
-          borderRadius: "50%",
-          background: brandColor,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "white",
-          fontWeight: 700,
-          fontSize: 14,
-          position: "relative",
-          flexShrink: 0,
+          width: 36, height: 36, borderRadius: "50%", background: brandColor,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "white", fontWeight: 700, fontSize: 14, flexShrink: 0, position: "relative",
         }}>
           S
           <span style={{
-            position: "absolute",
-            bottom: 1,
-            right: 1,
-            width: 9,
-            height: 9,
-            borderRadius: "50%",
-            background: "#22c55e",
-            border: "2px solid white",
+            position: "absolute", bottom: 1, right: 1,
+            width: 9, height: 9, borderRadius: "50%",
+            background: "#22c55e", border: "2px solid white",
           }} />
         </div>
         <div>
@@ -368,43 +470,28 @@ export default function WidgetPage() {
 
       {/* Messages */}
       <div ref={scrollContainerRef} style={{
-        flex: 1,
-        overflowY: "auto",
+        flex: 1, overflowY: "auto",
         padding: "16px 12px 8px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
+        display: "flex", flexDirection: "column", gap: 10,
       }}>
         {messages.map((msg, i) => (
           <div key={i} style={{
-            display: "flex",
-            justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-            gap: 8,
-            alignItems: "flex-end",
+            display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+            gap: 8, alignItems: "flex-end",
           }}>
             {msg.role === "assistant" && (
               <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                background: brandColor,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "white",
-                fontWeight: 700,
-                fontSize: 11,
-                flexShrink: 0,
+                width: 28, height: 28, borderRadius: "50%", background: brandColor,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "white", fontWeight: 700, fontSize: 11, flexShrink: 0,
               }}>S</div>
             )}
             <div style={{
-              maxWidth: "78%",
-              padding: "9px 13px",
+              maxWidth: "78%", padding: "9px 13px",
               borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
               background: msg.role === "user" ? "#111" : "#f4f4f5",
               color: msg.role === "user" ? "#fff" : "#111",
-              fontSize: 13,
-              lineHeight: 1.5,
+              fontSize: 13, lineHeight: 1.5,
             }}>
               {renderMarkdown(msg.text)}
             </div>
@@ -414,8 +501,7 @@ export default function WidgetPage() {
         {loading && (
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
             <div style={{
-              width: 28, height: 28, borderRadius: "50%",
-              background: brandColor,
+              width: 28, height: 28, borderRadius: "50%", background: brandColor,
               display: "flex", alignItems: "center", justifyContent: "center",
               color: "white", fontWeight: 700, fontSize: 11, flexShrink: 0,
             }}>S</div>
@@ -423,7 +509,7 @@ export default function WidgetPage() {
               padding: "9px 14px", borderRadius: "18px 18px 18px 4px",
               background: "#f4f4f5", display: "flex", gap: 4, alignItems: "center",
             }}>
-              {[0, 1, 2].map(i => (
+              {[0,1,2].map(i => (
                 <span key={i} style={{
                   width: 6, height: 6, borderRadius: "50%", background: "#9ca3af",
                   animation: "pulse 1.2s ease-in-out infinite",
@@ -433,97 +519,86 @@ export default function WidgetPage() {
             </div>
           </div>
         )}
-
-        <div ref={bottomRef} />
+        <div style={{ height: 4 }} />
       </div>
 
-      {/* Suggestions */}
-      {suggestions.length > 0 && (
-        <div style={{
-          padding: "6px 12px",
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 6,
-          flexShrink: 0,
-        }}>
+      {/* Suggestions (bare når ikke i booking-flyt) */}
+      {suggestions.length > 0 && showInput && (
+        <div style={{ padding: "6px 12px", display: "flex", flexWrap: "wrap", gap: 6, flexShrink: 0 }}>
           {suggestions.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => handleSuggestionClick(s)}
-              style={{
-                padding: "5px 12px",
-                borderRadius: 20,
-                border: "1px solid #e5e7eb",
-                background: "#fff",
-                color: "#374151",
-                fontSize: 12,
-                cursor: "pointer",
-                transition: "all 0.15s",
-                whiteSpace: "nowrap",
-              }}
-              onMouseEnter={e => {
-                (e.target as HTMLElement).style.background = "#f4f4f5";
-                (e.target as HTMLElement).style.borderColor = "#d1d5db";
-              }}
-              onMouseLeave={e => {
-                (e.target as HTMLElement).style.background = "#fff";
-                (e.target as HTMLElement).style.borderColor = "#e5e7eb";
-              }}
-            >
-              {s}
-            </button>
+            <button key={i} onClick={() => handleSuggestionClick(s)} style={{
+              padding: "5px 12px", borderRadius: 20,
+              border: "1px solid #e5e7eb", background: "#fff",
+              color: "#374151", fontSize: 12, cursor: "pointer",
+              whiteSpace: "nowrap", transition: "all 0.15s",
+            }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#f4f4f5"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#fff"; }}
+            >{s}</button>
           ))}
         </div>
       )}
 
-      {/* Input */}
-      <div style={{
-        padding: "8px 12px 12px",
-        borderTop: "1px solid #f0f0f0",
-        display: "flex",
-        gap: 8,
-        flexShrink: 0,
-      }}>
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && !e.shiftKey && send(input)}
-          placeholder="Skriv en melding…"
-          style={{
-            flex: 1,
-            padding: "9px 14px",
-            borderRadius: 24,
-            border: "1px solid #e5e7eb",
-            fontSize: 13,
-            outline: "none",
-            background: "#fafafa",
-          }}
-          onFocus={e => { e.target.style.borderColor = brandColor; e.target.style.background = "#fff"; }}
-          onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.background = "#fafafa"; }}
+      {/* Slot picker */}
+      {booking.step === "slots" && (
+        <SlotPicker
+          clinicId={clinicId}
+          serviceId={booking.serviceId}
+          brandColor={brandColor}
+          onSelect={handleSlotSelect}
         />
-        <button
-          onClick={() => send(input)}
-          disabled={!input.trim() || loading}
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: "50%",
-            background: input.trim() && !loading ? "#111" : "#e5e7eb",
-            border: "none",
-            cursor: input.trim() && !loading ? "pointer" : "default",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            transition: "background 0.15s",
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-            <path d="M3 10L17 10M17 10L11 4M17 10L11 16" stroke={input.trim() && !loading ? "#fff" : "#9ca3af"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-      </div>
+      )}
+
+      {/* Info form */}
+      {booking.step === "info" && (
+        <InfoForm
+          date={booking.date}
+          time={booking.time}
+          dateLabel={booking.dateLabel}
+          brandColor={brandColor}
+          loading={bookingLoading}
+          onSubmit={handleInfoSubmit}
+          onCancel={() => setBooking(b => ({ ...b, step: "slots" }))}
+        />
+      )}
+
+      {/* Input (kun synlig når ikke i booking-flyt) */}
+      {showInput && (
+        <div style={{
+          padding: "8px 12px 12px", borderTop: "1px solid #f0f0f0",
+          display: "flex", gap: 8, flexShrink: 0,
+        }}>
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && !e.shiftKey && send(input)}
+            placeholder="Skriv en melding…"
+            style={{
+              flex: 1, padding: "9px 14px", borderRadius: 24,
+              border: "1px solid #e5e7eb", fontSize: 13,
+              outline: "none", background: "#fafafa",
+            }}
+            onFocus={e => { e.target.style.borderColor = brandColor; e.target.style.background = "#fff"; }}
+            onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.background = "#fafafa"; }}
+          />
+          <button
+            onClick={() => send(input)}
+            disabled={!input.trim() || loading}
+            style={{
+              width: 38, height: 38, borderRadius: "50%",
+              background: input.trim() && !loading ? "#111" : "#e5e7eb",
+              border: "none", cursor: input.trim() && !loading ? "pointer" : "default",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, transition: "background 0.15s",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+              <path d="M3 10L17 10M17 10L11 4M17 10L11 16" stroke={input.trim() && !loading ? "#fff" : "#9ca3af"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      )}
 
       <style>{`
         @keyframes pulse {
