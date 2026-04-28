@@ -1,34 +1,48 @@
+"use client";
+
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 
 const steps = [
   {
     number: "1",
-    title: "Vi bekrefter betalingen",
-    description: "Du mottar en bekreftelse på e-post innen få minutter.",
+    title: "Abonnementet er aktivert",
+    description: "Din klinikk er registrert og admin-panelet er klart til bruk.",
     time: "Nå",
+    done: true,
   },
   {
     number: "2",
-    title: "Vi setter opp din widget",
-    description: "Vi konfigurerer AI-resepsjonisten spesifikt for din klinikk — tjenester, priser og åpningstider.",
-    time: "Innen 24 timer",
+    title: "Logg inn og tilpass klinikken",
+    description: "Sett opp tjenester, priser, åpningstider og ansatte direkte i admin-panelet.",
+    time: "5 minutter",
+    done: false,
   },
   {
     number: "3",
-    title: "Du får en enkel kodelinje",
-    description: "Vi sender deg én linje kode du limer inn på nettsiden din. Det tar under 2 minutter.",
-    time: "Innen 24 timer",
+    title: "Kopier innbyggingskoden",
+    description: "Du finner én kodelinje under Innstillinger i admin. Lim den inn på nettsiden din.",
+    time: "2 minutter",
+    done: false,
   },
   {
     number: "4",
-    title: "Widgeten er live",
-    description: "AI-resepsjonisten din begynner å svare pasienter med en gang den er aktivert.",
-    time: "Dag 1–2",
+    title: "AI-resepsjonisten er live",
+    description: "Pasienter kan booke time direkte via widgeten — uten at du trenger å svare.",
+    time: "Dag 1",
+    done: false,
   },
 ];
 
-export default function TakkPage() {
+function TakkContent() {
+  const params = useSearchParams();
+  const clinicId = params.get("clinicId");
+  const adminUrl = clinicId
+    ? `/admin?clinicId=${encodeURIComponent(clinicId)}`
+    : "/admin";
+
   return (
     <main>
       <Nav />
@@ -47,21 +61,49 @@ export default function TakkPage() {
             Betaling mottatt!
           </h1>
           <p className="mt-4 text-lg text-ink-600 leading-relaxed">
-            Velkommen til SvarAI. Din AI-resepsjonist settes opp innen <strong>24 timer</strong> — vi tar kontakt på e-posten du oppga.
+            Velkommen til SvarAI. Klinikken din er klar — du kan sette opp alt selv i admin-panelet med en gang.
           </p>
+
+          {/* Primærknapp → admin */}
+          <a
+            href={adminUrl}
+            className="mt-8 inline-flex items-center gap-2 rounded-xl bg-brand-500 px-6 py-3.5 text-sm font-semibold text-white hover:bg-brand-600 transition shadow-md"
+          >
+            Gå til admin-panelet
+            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </a>
 
           {/* Steps */}
           <div className="mt-14 text-left space-y-4">
             <p className="text-sm font-semibold uppercase tracking-wider text-ink-500 mb-6">Hva skjer nå</p>
             {steps.map((step, i) => (
-              <div key={i} className="flex gap-5 rounded-2xl border border-ink-100 bg-white p-5 shadow-soft">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500 text-white font-bold text-sm">
-                  {step.number}
+              <div
+                key={i}
+                className={`flex gap-5 rounded-2xl border p-5 ${
+                  step.done
+                    ? "border-brand-200 bg-brand-50/60"
+                    : "border-ink-100 bg-white shadow-soft"
+                }`}
+              >
+                <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full font-bold text-sm ${
+                  step.done ? "bg-brand-500 text-white" : "bg-ink-100 text-ink-600"
+                }`}>
+                  {step.done ? (
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L9 11.6l6.3-6.3a1 1 0 011.4 0z" clipRule="evenodd" />
+                    </svg>
+                  ) : step.number}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold text-ink-900">{step.title}</p>
-                    <span className="text-xs text-ink-400 whitespace-nowrap">{step.time}</span>
+                    <p className={`font-semibold ${step.done ? "text-brand-700" : "text-ink-900"}`}>
+                      {step.title}
+                    </p>
+                    <span className={`text-xs whitespace-nowrap ${step.done ? "text-brand-500 font-medium" : "text-ink-400"}`}>
+                      {step.time}
+                    </span>
                   </div>
                   <p className="mt-1 text-sm text-ink-600 leading-relaxed">{step.description}</p>
                 </div>
@@ -69,22 +111,22 @@ export default function TakkPage() {
             ))}
           </div>
 
-          {/* Contact */}
+          {/* Kontakt */}
           <div className="mt-10 rounded-2xl border border-ink-100 bg-ink-50/50 p-6 text-left">
-            <p className="font-semibold text-ink-900">Spørsmål? Vi er her.</p>
+            <p className="font-semibold text-ink-900">Trenger du hjelp?</p>
             <p className="mt-1 text-sm text-ink-600">
-              Ta gjerne kontakt direkte — vi svarer raskt.
+              Vi hjelper deg med oppsett om du trenger det. Send oss en e-post, så svarer vi raskt.
             </p>
             <div className="mt-4 flex flex-col sm:flex-row gap-3">
               <a
-                href="mailto:Markus08aasheim@gmail.com"
+                href="mailto:hei@svarai.no"
                 className="inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-medium text-ink-900 hover:border-ink-300 transition"
               >
                 <svg className="h-4 w-4 text-brand-500" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
                   <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
                 </svg>
-                Markus08aasheim@gmail.com
+                hei@svarai.no
               </a>
               <a
                 href="tel:+4792167470"
@@ -109,5 +151,13 @@ export default function TakkPage() {
       </section>
       <Footer />
     </main>
+  );
+}
+
+export default function TakkPage() {
+  return (
+    <Suspense>
+      <TakkContent />
+    </Suspense>
   );
 }

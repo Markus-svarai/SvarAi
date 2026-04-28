@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       "client_reference_id":         clinicId,
       "metadata[clinic_id]":         clinicId,
       "metadata[clinic_name]":       clinicName ?? clinicId,
-      "success_url":                 `${BASE_URL}/admin?payment=success&clinicId=${encodeURIComponent(clinicId)}`,
+      "success_url":                 `${BASE_URL}/takk?clinicId=${encodeURIComponent(clinicId)}`,
       "cancel_url":                  `${BASE_URL}/registrer?payment=cancelled`,
       "subscription_data[metadata][clinic_id]": clinicId,
     });
