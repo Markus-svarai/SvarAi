@@ -5,9 +5,9 @@ import { useState } from "react";
 const links = [
   { href: "#problem", label: "Problemet" },
   { href: "#hvordan", label: "Hvordan" },
-  { href: "#fordeler", label: "Fordeler" },
   { href: "#demo", label: "Demo" },
   { href: "#priser", label: "Priser" },
+  { href: "#kontakt", label: "Kontakt" },
 ];
 
 export default function Nav() {
@@ -33,20 +33,11 @@ export default function Nav() {
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
-          <a href="#demo" className="text-sm text-ink-700 hover:text-ink-900 transition">
-            Prøv demo
-          </a>
-          <a
-            href="#kontakt"
-            className="text-sm text-ink-700 hover:text-ink-900 transition"
-          >
-            Book demo
-          </a>
           <a
             href="/registrer"
             className="inline-flex items-center rounded-lg bg-ink-900 text-white text-sm font-medium px-4 py-2 hover:bg-ink-800 transition"
           >
-            Kom i gang →
+            Registrer klinikk →
           </a>
         </div>
 

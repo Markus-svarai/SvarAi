@@ -36,6 +36,34 @@ export default function CTA() {
                   </li>
                 ))}
               </ul>
+
+              <div className="mt-8 pt-6 border-t border-ink-100">
+                <p className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-4">Eller ta kontakt direkte</p>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-ink-100 flex items-center justify-center text-sm font-bold text-ink-700 shrink-0">
+                    AH
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-ink-900">Alexander Hagen</p>
+                    <p className="text-xs text-ink-500">SvarAI</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-col gap-2">
+                  <a href="tel:+4747229344" className="inline-flex items-center gap-2 text-sm text-ink-700 hover:text-ink-900 transition">
+                    <svg className="h-4 w-4 text-brand-500 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                    </svg>
+                    +47 472 29 344
+                  </a>
+                  <a href="mailto:alexander.magnus.hagen@gmail.com" className="inline-flex items-center gap-2 text-sm text-ink-700 hover:text-ink-900 transition">
+                    <svg className="h-4 w-4 text-brand-500 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                      <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                    </svg>
+                    alexander.magnus.hagen@gmail.com
+                  </a>
+                </div>
+              </div>
             </div>
 
             <div className="lg:col-span-3">
