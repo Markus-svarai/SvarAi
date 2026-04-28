@@ -341,11 +341,12 @@ export default function WidgetPage() {
       });
       const data = await res.json();
 
-      if (data.action?.type === "start_booking" && data.action.serviceId) {
-        // Sett booking-steg og melding i samme render — ingen race condition
+      if (data.action?.type === "start_booking") {
+        // Trigger SlotPicker uansett — bruk serviceId fra action eller fallback
+        const sid = (data.action.serviceId as string) || "undersokelse";
         setMessages(prev => [...prev, { role: "assistant", text: data.reply }]);
         setSuggestions([]);
-        setBooking({ ...INIT_BOOKING, step: "slots", serviceId: data.action.serviceId as string });
+        setBooking({ ...INIT_BOOKING, step: "slots", serviceId: sid });
       } else {
         addAssistantMessage(data.reply, data.suggestions);
       }
