@@ -123,7 +123,7 @@ BOOKING-REGLER:
 - Bruk serviceId fra tjenestelisten over.
 - Hvis det ikke er ledige tider, be dem ringe: ${config.contact.phone}
 
-SVAR-FORMAT:
+${config.botInstructions ? `KLINIKK-SPESIFIKKE INSTRUKSJONER (høy prioritet — følg disse foran generelle regler):\n${config.botInstructions}\n\n` : ""}SVAR-FORMAT:
 Du MÅ alltid svare med gyldig JSON i dette formatet:
 {
   "reply": "Melding til pasienten (støtter **bold** og linjeskift med \\n)",

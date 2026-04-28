@@ -51,6 +51,7 @@ export async function getClinicData(clinicId: string): Promise<ClinicConfig> {
       services: mappedServices.length > 0 ? mappedServices : clinicConfig.services,
       cancellationPolicy: clinic.cancellation_policy ?? clinicConfig.cancellationPolicy,
       bookingLeadHours: clinic.booking_lead_hours ?? clinicConfig.bookingLeadHours,
+      botInstructions: clinic.bot_instructions ?? undefined,
     };
   } catch (err) {
     console.error("[getClinicData] feil:", err);

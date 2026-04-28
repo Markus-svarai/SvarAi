@@ -17,6 +17,7 @@ type Clinic = {
   contact_website: string;
   cancellation_policy: string;
   booking_lead_hours: number;
+  bot_instructions?: string;
   subscription_status?: string;
 };
 
@@ -879,6 +880,24 @@ function ClinicTab({ clinicId }: { clinicId: string }) {
                 className="mt-1 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 resize-none"
               />
             </label>
+          </div>
+        </Section>
+
+        <Section title="AI-personlighet">
+          <div className="space-y-2">
+            <label className="block">
+              <span className="text-xs font-medium text-ink-700">Klinikk-spesifikke instruksjoner til chatboten</span>
+              <textarea
+                rows={5}
+                value={form.bot_instructions ?? ""}
+                onChange={e => set("bot_instructions", e.target.value)}
+                placeholder={"Eksempel:\n- Denne klinikken spesialiserer seg på barn — vær ekstra rolig og tålmodig\n- Vi tilbyr alltid gratis konsultasjon for nye pasienter\n- Ikke nevn konkurrenter ved navn"}
+                className="mt-1 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 resize-y font-mono"
+              />
+            </label>
+            <p className="text-xs text-ink-400">
+              Skriv inn spesielle regler, tone eller kunnskap som gjelder akkurat denne klinikken. Dette legges til i AI-ens instruksjoner med høy prioritet.
+            </p>
           </div>
         </Section>
 

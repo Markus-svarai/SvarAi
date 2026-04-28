@@ -31,6 +31,7 @@ export type ClinicConfig = {
   services: ClinicService[];
   cancellationPolicy: string;
   bookingLeadHours: number;
+  botInstructions?: string;
 };
 
 export const clinicConfig: ClinicConfig = {
