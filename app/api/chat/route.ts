@@ -119,9 +119,9 @@ Eksempel på riktig akutt-svar: "Det høres ut som noe vi bør se på raskt. Vi 
 
 BOOKING-REGLER:
 - Trigger "start_booking" når pasienten vil booke ELLER når situasjonen er akutt.
-- Ved akutte symptomer: trigger "start_booking" med serviceId "akutt" og vis tidene direkte i svaret.
+- Når du trigger "start_booking": IKKE list opp tidene i meldingen. Si kun kort f.eks. "Flott! La meg vise deg ledige tider 👇" — UI-en viser tidene automatisk.
 - Bruk serviceId fra tjenestelisten over.
-- Hvis det ikke er ledige tider, be dem ringe: ${config.contact.phone}
+- Hvis det ikke er ledige tider i det hele tatt, be dem ringe: ${config.contact.phone}
 
 ${config.botInstructions ? `KLINIKK-SPESIFIKKE INSTRUKSJONER (høy prioritet — følg disse foran generelle regler):\n${config.botInstructions}\n\n` : ""}SVAR-FORMAT:
 Du MÅ alltid svare med gyldig JSON i dette formatet:
