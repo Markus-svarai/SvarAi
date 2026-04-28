@@ -1,4 +1,3 @@
-import ChatDemo from "./ChatDemo";
 import { clinicConfig } from "@/lib/clinic-config";
 
 export default function DemoSection() {
@@ -16,8 +15,14 @@ export default function DemoSection() {
           </p>
         </div>
 
-        <div className="mt-12">
-          <ChatDemo />
+        <div className="mt-12 flex justify-center">
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-xl border border-ink-100" style={{ height: 560 }}>
+            <iframe
+              src="/widget?id=demo&color=1ea67e"
+              className="w-full h-full border-0"
+              title="SvarAI Live Demo"
+            />
+          </div>
         </div>
 
         <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm text-ink-600">
