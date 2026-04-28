@@ -1168,9 +1168,200 @@ function SubscriptionBadge({ clinicId }: { clinicId: string }) {
   );
 }
 
+// ── StatsTab ───────────────────────────────────────────────────────────────
+
+type Stats = {
+  bookings: {
+    total: number;
+    thisMonth: number;
+    lastMonth: number;
+    byStatus: Record<string, number>;
+    byService: Record<string, number>;
+    daily: { date: string; count: number }[];
+  };
+  conversations: {
+    total: number;
+    thisMonth: number;
+    unanswered: number;
+  };
+};
+
+function MiniBar({ value, max }: { value: number; max: number }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div className="h-1.5 rounded-full bg-ink-100 overflow-hidden">
+      <div className="h-full rounded-full bg-brand-500 transition-all" style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+function SparkLine({ daily }: { daily: { date: string; count: number }[] }) {
+  const max = Math.max(...daily.map(d => d.count), 1);
+  const w = 300; const h = 48; const pts = daily.length;
+  const points = daily.map((d, i) => {
+    const x = (i / (pts - 1)) * w;
+    const y = h - (d.count / max) * (h - 4) - 2;
+    return `${x},${y}`;
+  }).join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-12" preserveAspectRatio="none">
+      <polyline points={points} fill="none" stroke="#1ea67e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function StatsTab({ clinicId }: { clinicId: string }) {
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/admin/stats?clinicId=${encodeURIComponent(clinicId)}`)
+      .then(r => r.json())
+      .then(setStats)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [clinicId]);
+
+  if (loading) return (
+    <div className="flex justify-center py-16">
+      <div className="h-6 w-6 border-2 border-ink-200 border-t-ink-800 rounded-full animate-spin" />
+    </div>
+  );
+
+  if (!stats) return (
+    <p className="text-sm text-ink-500 text-center py-12">Kunne ikke laste statistikk.</p>
+  );
+
+  const { bookings, conversations } = stats;
+  const trend = bookings.lastMonth > 0
+    ? Math.round(((bookings.thisMonth - bookings.lastMonth) / bookings.lastMonth) * 100)
+    : null;
+
+  const maxService = Math.max(...Object.values(bookings.byService), 1);
+
+  const statusLabels: Record<string, string> = {
+    confirmed: "Bekreftet", ny: "Ny", cancelled: "Avlyst", completed: "Fullført",
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* KPI */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Bookinger totalt", value: bookings.total },
+          {
+            label: "Denne måneden",
+            value: bookings.thisMonth,
+            sub: trend !== null ? (trend >= 0 ? `+${trend}% vs forrige` : `${trend}% vs forrige`) : undefined,
+            subColor: trend !== null && trend >= 0 ? "text-brand-600" : "text-red-500",
+          },
+          { label: "Samtaler totalt", value: conversations.total },
+          { label: "Ubesvarte spørsmål", value: conversations.unanswered, subColor: conversations.unanswered > 0 ? "text-amber-600" : "text-ink-400" },
+        ].map(k => (
+          <div key={k.label} className="rounded-xl border border-ink-200 bg-white p-4">
+            <div className="text-2xl font-bold text-ink-900">{k.value}</div>
+            <div className="text-xs text-ink-500 mt-0.5">{k.label}</div>
+            {k.sub && <div className={`text-xs font-medium mt-1 ${k.subColor}`}>{k.sub}</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* Sparkline */}
+      <div className="rounded-xl border border-ink-200 bg-white p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-ink-800">Bookinger siste 30 dager</h3>
+          <span className="text-xs text-ink-400">per dag</span>
+        </div>
+        <SparkLine daily={bookings.daily} />
+        <div className="flex justify-between mt-1">
+          <span className="text-xs text-ink-400">{bookings.daily[0]?.date}</span>
+          <span className="text-xs text-ink-400">{bookings.daily[bookings.daily.length - 1]?.date}</span>
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        {/* Tjenester */}
+        <div className="rounded-xl border border-ink-200 bg-white p-5">
+          <h3 className="text-sm font-semibold text-ink-800 mb-4">Populære tjenester</h3>
+          {Object.keys(bookings.byService).length === 0 ? (
+            <p className="text-sm text-ink-400">Ingen data ennå.</p>
+          ) : (
+            <div className="space-y-3">
+              {Object.entries(bookings.byService)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([name, count]) => (
+                  <div key={name}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-ink-700 font-medium truncate">{name}</span>
+                      <span className="text-ink-500 ml-2 shrink-0">{count} stk</span>
+                    </div>
+                    <MiniBar value={count} max={maxService} />
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+
+        {/* Status */}
+        <div className="rounded-xl border border-ink-200 bg-white p-5">
+          <h3 className="text-sm font-semibold text-ink-800 mb-4">Status-fordeling</h3>
+          {Object.keys(bookings.byStatus).length === 0 ? (
+            <p className="text-sm text-ink-400">Ingen data ennå.</p>
+          ) : (
+            <div className="space-y-3">
+              {Object.entries(bookings.byStatus)
+                .sort((a, b) => b[1] - a[1])
+                .map(([status, count]) => {
+                  const colors: Record<string, string> = {
+                    confirmed: "bg-brand-50 text-brand-700 border-brand-200",
+                    ny: "bg-blue-50 text-blue-700 border-blue-200",
+                    cancelled: "bg-red-50 text-red-600 border-red-200",
+                    completed: "bg-ink-50 text-ink-600 border-ink-200",
+                  };
+                  return (
+                    <div key={status} className="flex items-center justify-between">
+                      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${colors[status] ?? "bg-ink-50 text-ink-600 border-ink-200"}`}>
+                        {statusLabels[status] ?? status}
+                      </span>
+                      <span className="text-sm font-semibold text-ink-800">{count}</span>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Konvertering */}
+      {conversations.total > 0 && (
+        <div className="rounded-xl border border-ink-200 bg-white p-5">
+          <h3 className="text-sm font-semibold text-ink-800 mb-1">Chat-konvertering</h3>
+          <p className="text-xs text-ink-500 mb-3">Hvor mange samtaler ender i en booking</p>
+          <div className="flex items-end gap-3">
+            <div className="text-3xl font-bold text-ink-900">
+              {Math.round((bookings.total / conversations.total) * 100)}%
+            </div>
+            <div className="text-xs text-ink-500 mb-1">
+              {bookings.total} bookinger / {conversations.total} samtaler
+            </div>
+          </div>
+          <div className="mt-3 h-2 rounded-full bg-ink-100 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-brand-500"
+              style={{ width: `${Math.min(Math.round((bookings.total / conversations.total) * 100), 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 const TABS = [
+  { id: "stats",          label: "Statistikk" },
   { id: "bookings",       label: "Bookinger" },
   { id: "conversations",  label: "Samtaler" },
   { id: "staff",          label: "Ansatte" },
@@ -1181,7 +1372,7 @@ const TABS = [
 
 export default function AdminPage() {
   const [clinicId, setClinicId] = useState("");
-  const [tab, setTab] = useState("bookings");
+  const [tab, setTab] = useState("stats");
 
   // Super-admin bypass: les clinicId og supertoken fra URL
   useEffect(() => {
@@ -1247,6 +1438,7 @@ export default function AdminPage() {
 
       {/* Content */}
       <main className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
+        {tab === "stats"         && <StatsTab           clinicId={clinicId} />}
         {tab === "bookings"      && <BookingsTab       clinicId={clinicId} />}
         {tab === "conversations" && <ConversationsTab  clinicId={clinicId} />}
         {tab === "staff"         && <StaffTab          clinicId={clinicId} />}
