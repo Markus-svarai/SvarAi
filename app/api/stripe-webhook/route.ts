@@ -162,7 +162,8 @@ export async function POST(req: NextRequest) {
       const customerId  = obj.customer;
       const subsId      = obj.subscription;
       const email       = obj.customer_details?.email;
-      const hasTrial    = obj.subscription ? true : false; // trial startet via checkout
+      // Stripe setter trial_end på subscription-objektet når prøveperiode er aktiv
+      const hasTrial    = !!(obj.subscription && obj.amount_total === 0);
 
       if (clinicId) {
         await updateClinic(clinicId, {
@@ -234,6 +235,51 @@ export async function POST(req: NextRequest) {
             );
           }
         }
+      }
+      break;
+    }
+
+    // ── Prøveperiode utløper om 3 dager → send påminnelse ───────────────
+    case "customer.subscription.trial_will_end": {
+      const subsId = obj.id;
+      const trialEnd: number = obj.trial_end; // Unix timestamp
+      const trialEndDate = new Date(trialEnd * 1000).toLocaleDateString("nb-NO", {
+        weekday: "long", day: "numeric", month: "long",
+      });
+
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/clinics?stripe_subscription_id=eq.${encodeURIComponent(subsId)}&select=id,name,contact_email&limit=1`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      );
+      const rows = await res.json();
+      const clinic = rows?.[0];
+
+      if (clinic?.contact_email) {
+        const adminUrl = `https://svarai.no/admin?clinicId=${encodeURIComponent(clinic.id)}`;
+        await sendEmail(
+          clinic.contact_email,
+          `Prøveperioden din utløper ${trialEndDate}`,
+          `<div style="font-family: system-ui, sans-serif; max-width: 520px; color: #111;">
+            <div style="background: #111827; border-radius: 12px 12px 0 0; padding: 20px 28px;">
+              <span style="font-size: 18px; font-weight: 700; color: #fff;">SvarAI</span>
+            </div>
+            <div style="border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px; padding: 28px;">
+              <h2 style="margin: 0 0 8px; font-size: 20px; color: #111827;">Prøveperioden utløper snart</h2>
+              <p style="color: #6b7280; margin: 0 0 20px; font-size: 14px;">
+                Hei ${clinic.name}, prøveperioden din utløper <strong>${trialEndDate}</strong>. Etter det belastes kortet ditt automatisk med 1 490 kr/mnd.
+              </p>
+              <p style="color: #374151; font-size: 14px; margin: 0 0 20px;">
+                Ønsker du ikke å fortsette, kan du avbestille abonnementet enkelt i admin-panelet — ingen spørsmål stilt.
+              </p>
+              <a href="${adminUrl}" style="display: inline-block; background: #1ea67e; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 14px; margin-bottom: 8px;">
+                Gå til admin-panelet
+              </a>
+              <p style="font-size: 12px; color: #9ca3af; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 16px;">
+                SvarAI · <a href="https://svarai.no" style="color: #9ca3af;">svarai.no</a> · hei@svarai.no
+              </p>
+            </div>
+          </div>`
+        );
       }
       break;
     }
