@@ -96,10 +96,16 @@ export async function GET(req: NextRequest) {
     const hours = await sb(
       `/clinic_hours?clinic_id=eq.${encodeURIComponent(clinicId)}&day=eq.${encodeURIComponent(dayName)}&limit=1`
     );
-    const dayHours = hours?.[0];
+    let dayHours = hours?.[0];
 
     if (!dayHours?.open || !dayHours?.close) {
-      return NextResponse.json({ date, slots: [], closed: true });
+      // Ingen åpningstider satt opp for denne dagen — bruk standard hverdagstider
+      const dow = new Date(date + "T12:00:00Z").getUTCDay();
+      if (dow === 0 || dow === 6) {
+        return NextResponse.json({ date, slots: [], closed: true });
+      }
+      // Sett inn default åpningstider for hverdager
+      dayHours = { open: "08:00", close: "17:00" };
     }
 
     // Hent tjenestens varighet
