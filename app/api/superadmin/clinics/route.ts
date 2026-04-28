@@ -48,11 +48,33 @@ export async function GET(req: NextRequest) {
       if (!lastActivity[b.clinic_id]) lastActivity[b.clinic_id] = b.created_at;
     }
 
-    const result = (clinics ?? []).map((c: any) => ({
-      ...c,
-      booking_count: bookingCounts[c.id] ?? 0,
-      last_activity: lastActivity[c.id] ?? null,
-    }));
+    // Hent samtale-statistikk per klinikk
+    const conversations = await sb(`/conversations?select=clinic_id,ended_in_booking,updated_at&order=updated_at.desc&limit=2000`);
+    const convCounts: Record<string, number> = {};
+    const convBookings: Record<string, number> = {};
+    const convActivity: Record<string, string> = {};
+    for (const c of conversations ?? []) {
+      convCounts[c.clinic_id] = (convCounts[c.clinic_id] ?? 0) + 1;
+      if (c.ended_in_booking) convBookings[c.clinic_id] = (convBookings[c.clinic_id] ?? 0) + 1;
+      if (!convActivity[c.clinic_id]) convActivity[c.clinic_id] = c.updated_at;
+    }
+
+    const result = (clinics ?? []).map((c: any) => {
+      const convTotal = convCounts[c.id] ?? 0;
+      const convBooked = convBookings[c.id] ?? 0;
+      // Siste aktivitet: nyeste av booking og samtale
+      const lastA = lastActivity[c.id] ?? null;
+      const lastC = convActivity[c.id] ?? null;
+      const last_activity = !lastA ? lastC : !lastC ? lastA :
+        new Date(lastA) > new Date(lastC) ? lastA : lastC;
+      return {
+        ...c,
+        booking_count: bookingCounts[c.id] ?? 0,
+        conversation_count: convTotal,
+        booking_rate: convTotal > 0 ? Math.round((convBooked / convTotal) * 100) : null,
+        last_activity,
+      };
+    });
 
     return NextResponse.json(result);
   } catch (err: any) {

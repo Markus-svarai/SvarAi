@@ -9,6 +9,8 @@ type Clinic = {
   contact_email: string;
   subscription_status: string;
   booking_count: number;
+  conversation_count: number;
+  booking_rate: number | null;
   last_activity: string | null;
   created_at: string;
 };
@@ -135,18 +137,28 @@ function ClinicRow({ clinic, onOpen }: { clinic: Clinic; onOpen: () => void }) {
       </div>
 
       {/* Stats */}
-      <div className="hidden sm:flex items-center gap-6 shrink-0 text-center">
+      <div className="hidden sm:flex items-center gap-5 shrink-0 text-center">
+        <div>
+          <div className="text-lg font-bold text-white">{clinic.conversation_count}</div>
+          <div className="text-xs text-ink-500">samtaler</div>
+        </div>
         <div>
           <div className="text-lg font-bold text-white">{clinic.booking_count}</div>
           <div className="text-xs text-ink-500">bookinger</div>
         </div>
         <div>
-          <div className="text-sm font-medium text-ink-300">{fmtRelative(clinic.last_activity)}</div>
-          <div className="text-xs text-ink-500">siste aktivitet</div>
+          {clinic.booking_rate !== null ? (
+            <div className={`text-lg font-bold ${clinic.booking_rate >= 20 ? "text-green-400" : clinic.booking_rate >= 10 ? "text-amber-400" : "text-ink-400"}`}>
+              {clinic.booking_rate}%
+            </div>
+          ) : (
+            <div className="text-lg font-bold text-ink-600">—</div>
+          )}
+          <div className="text-xs text-ink-500">konvertering</div>
         </div>
         <div>
-          <div className="text-sm font-medium text-ink-300">{fmtDate(clinic.created_at)}</div>
-          <div className="text-xs text-ink-500">registrert</div>
+          <div className="text-sm font-medium text-ink-300">{fmtRelative(clinic.last_activity)}</div>
+          <div className="text-xs text-ink-500">siste aktivitet</div>
         </div>
       </div>
 
@@ -210,6 +222,10 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
   const active = clinics.filter(c => c.subscription_status === "active").length;
   const inactive = clinics.filter(c => c.subscription_status === "inactive").length;
   const totalBookings = clinics.reduce((s, c) => s + c.booking_count, 0);
+  const totalConversations = clinics.reduce((s, c) => s + (c.conversation_count ?? 0), 0);
+  const overallConvRate = totalConversations > 0
+    ? Math.round((totalBookings / totalConversations) * 100)
+    : null;
 
   return (
     <div className="min-h-screen bg-ink-950">
@@ -230,18 +246,26 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
 
       <main className="mx-auto max-w-5xl px-4 sm:px-6 py-8">
         {/* KPI */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <div className="rounded-xl border border-ink-800 bg-ink-900 p-5 text-center">
             <div className="text-3xl font-bold text-white">{clinics.length}</div>
-            <div className="text-xs text-ink-400 mt-1">Klinikker totalt</div>
+            <div className="text-xs text-ink-400 mt-1">Klinikker</div>
           </div>
           <div className="rounded-xl border border-green-900 bg-green-950 p-5 text-center">
             <div className="text-3xl font-bold text-green-400">{active}</div>
             <div className="text-xs text-green-600 mt-1">Aktive abonnement</div>
           </div>
           <div className="rounded-xl border border-ink-800 bg-ink-900 p-5 text-center">
-            <div className="text-3xl font-bold text-white">{totalBookings}</div>
-            <div className="text-xs text-ink-400 mt-1">Bookinger totalt</div>
+            <div className="text-3xl font-bold text-white">{totalConversations}</div>
+            <div className="text-xs text-ink-400 mt-1">Samtaler totalt</div>
+          </div>
+          <div className="rounded-xl border border-ink-800 bg-ink-900 p-5 text-center">
+            <div className={`text-3xl font-bold ${overallConvRate !== null && overallConvRate >= 15 ? "text-green-400" : "text-white"}`}>
+              {overallConvRate !== null ? `${overallConvRate}%` : `${totalBookings}`}
+            </div>
+            <div className="text-xs text-ink-400 mt-1">
+              {overallConvRate !== null ? "Booking-rate" : "Bookinger totalt"}
+            </div>
           </div>
         </div>
 
