@@ -104,6 +104,13 @@ export async function getBookings(clinicId: string, limit = 50) {
   );
 }
 
+export async function getBookingsByDate(date: string) {
+  // Henter alle bookinger for en gitt dato på tvers av klinikker (for SMS-påminnelser)
+  return supabaseFetch(
+    `/bookings?date=eq.${encodeURIComponent(date)}&status=neq.cancelled&order=time.asc`
+  );
+}
+
 // ── Samtaler ───────────────────────────────────────────────────────────────
 
 export async function upsertConversation(data: {
