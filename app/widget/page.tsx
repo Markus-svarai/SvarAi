@@ -428,7 +428,7 @@ export default function WidgetPage() {
   return (
     <div style={{
       display: "flex", flexDirection: "column",
-      height: "100vh", height: "100dvh" as any,
+      height: "100dvh",
       fontFamily: "system-ui, -apple-system, sans-serif",
       background: "#ffffff", overflow: "hidden",
     }}>
