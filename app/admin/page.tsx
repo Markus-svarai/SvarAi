@@ -527,7 +527,7 @@ function StaffTab({ clinicId }: { clinicId: string }) {
                 className="mt-1 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
               />
               <p className="mt-1 text-xs text-ink-400">
-                Lim inn iCal-lenke fra Google Calendar, Outlook, Visma eller annet system. Brukes til å unngå dobbeltbooking.
+                Lim inn iCal-lenke fra Google Calendar eller Outlook. Brukes til å unngå dobbeltbooking.
               </p>
             </label>
           </div>
