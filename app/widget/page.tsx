@@ -460,6 +460,7 @@ export default function WidgetPage() {
       <div ref={scrollContainerRef} style={{
         flex: 1, overflowY: "auto",
         WebkitOverflowScrolling: "touch" as any, // smooth scroll on iOS
+        overscrollBehavior: "contain", // prevents pull-to-refresh on Android
         padding: "16px 12px 8px",
         display: "flex", flexDirection: "column", gap: 10,
       }}>
@@ -606,7 +607,7 @@ export default function WidgetPage() {
           to   { opacity: 1; }
         }
         * { box-sizing: border-box; }
-        html, body { margin: 0; height: 100%; overflow: hidden; }
+        html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; }
         .booking-panel { animation: slideUp 0.22s ease; }
         .msg-bubble { animation: fadeIn 0.18s ease; }
         button {
