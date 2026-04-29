@@ -272,7 +272,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Send e-poster parallelt: klinikk + pasient
-    const notifyEmail = config.contact.email || NOTIFY_EMAIL;
+    // Demo-klinikk bruker alltid NOTIFY_EMAIL (env var eller fallback til Markus sin Gmail)
+    const notifyEmail = clinicId === "demo"
+      ? NOTIFY_EMAIL
+      : (config.contact.email || NOTIFY_EMAIL);
     await Promise.all([
       sendBookingEmail(booking, service.priceNok, service.durationMinutes, config.name, notifyEmail),
       sendPatientReceiptEmail(booking, config.name, config.contact.phone),
