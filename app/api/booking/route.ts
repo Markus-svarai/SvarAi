@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { formatNok } from "@/lib/clinic-config";
 import { getClinicData } from "@/lib/get-clinic-data";
 import { saveBooking, isSupabaseConfigured } from "@/lib/supabase";
+import { generateToken } from "@/lib/booking-token";
 
 export const runtime = "nodejs";
 
-// Resend sender e-post til klinikken når noen booker.
-// Klinikken ringer pasienten tilbake for å bekrefte.
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const NOTIFY_EMAIL = process.env.LEAD_NOTIFY_EMAIL || "Markus08aasheim@gmail.com";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://svarai.no";
 
 type Booking = {
   id: string;
@@ -128,7 +128,7 @@ async function sendPatientReceiptEmail(
   }
 }
 
-// Sender e-post til klinikken med all booking-info + .ics vedlegg
+// Sender e-post til klinikken med Bekreft/Avvis-knapper + .ics vedlegg
 async function sendBookingEmail(
   booking: Booking,
   servicePriceNok: number,
@@ -141,6 +141,10 @@ async function sendBookingEmail(
     return false;
   }
 
+  const token = generateToken(booking.id);
+  const confirmUrl = `${BASE_URL}/api/booking/confirm?id=${booking.id}&action=confirm&token=${token}`;
+  const rejectUrl  = `${BASE_URL}/api/booking/confirm?id=${booking.id}&action=reject&token=${token}`;
+
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -151,7 +155,7 @@ async function sendBookingEmail(
       body: JSON.stringify({
         from: "SvarAI <hei@svarai.no>",
         to: [notifyEmail],
-        subject: `📅 Ny booking: ${booking.serviceName} – ${booking.name}`,
+        subject: `📅 Ny bookingforespørsel: ${booking.serviceName} – ${booking.name}`,
         attachments: [
           {
             filename: `booking-${booking.id}.ics`,
@@ -159,34 +163,38 @@ async function sendBookingEmail(
           },
         ],
         html: `
-          <div style="font-family: system-ui, sans-serif; max-width: 520px;">
-            <h2 style="color: #1a1a2e; margin-bottom: 4px;">Ny booking fra ${clinicName}</h2>
-            <p style="color: #6b7280; margin-top: 0;">En pasient har bestilt time via SvarAI. Ring for å bekrefte.</p>
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
+          <div style="font-family:system-ui,sans-serif;max-width:520px;color:#111;">
+            <h2 style="color:#1a1a2e;margin-bottom:4px;">Ny bookingforespørsel</h2>
+            <p style="color:#6b7280;margin-top:0;">En pasient ønsker time hos ${clinicName}. Bekreft eller avvis nedenfor.</p>
 
-            <h3 style="font-size: 14px; color: #374151; margin-bottom: 8px;">📋 Bookingdetaljer</h3>
-            <table style="font-size: 14px; color: #374151; width: 100%;">
-              <tr><td style="padding: 4px 12px 4px 0; font-weight: 600; width: 120px;">Bookingnr.</td><td><strong>${booking.id}</strong></td></tr>
-              <tr><td style="padding: 4px 12px 4px 0; font-weight: 600;">Behandling</td><td>${booking.serviceName}</td></tr>
-              <tr><td style="padding: 4px 12px 4px 0; font-weight: 600;">Dato</td><td>${formatDate(booking.date)}</td></tr>
-              <tr><td style="padding: 4px 12px 4px 0; font-weight: 600;">Tidspunkt</td><td>kl. ${booking.time}</td></tr>
-              <tr><td style="padding: 4px 12px 4px 0; font-weight: 600;">Pris</td><td>${formatNok(servicePriceNok)}</td></tr>
+            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin:20px 0;">
+              <table style="font-size:14px;color:#374151;width:100%;border-collapse:collapse;">
+                <tr><td style="padding:5px 12px 5px 0;font-weight:600;color:#6b7280;width:110px;">Pasient</td><td><strong>${booking.name}</strong></td></tr>
+                <tr><td style="padding:5px 12px 5px 0;font-weight:600;color:#6b7280;">Telefon</td><td><a href="tel:${booking.phone}" style="color:#1a1a2e;">${booking.phone}</a></td></tr>
+                <tr><td style="padding:5px 12px 5px 0;font-weight:600;color:#6b7280;">E-post</td><td><a href="mailto:${booking.email}" style="color:#1a1a2e;">${booking.email}</a></td></tr>
+                <tr><td style="padding:5px 12px 5px 0;font-weight:600;color:#6b7280;">Behandling</td><td>${booking.serviceName}</td></tr>
+                <tr><td style="padding:5px 12px 5px 0;font-weight:600;color:#6b7280;">Dato</td><td>${formatDate(booking.date)}</td></tr>
+                <tr><td style="padding:5px 12px 5px 0;font-weight:600;color:#6b7280;">Tidspunkt</td><td>kl. ${booking.time}</td></tr>
+                <tr><td style="padding:5px 12px 5px 0;font-weight:600;color:#6b7280;">Pris</td><td>${formatNok(servicePriceNok)}</td></tr>
+                ${booking.staffName ? `<tr><td style="padding:5px 12px 5px 0;font-weight:600;color:#6b7280;">Ansatt</td><td>${booking.staffName}</td></tr>` : ""}
+              </table>
+            </div>
+
+            <table style="width:100%;border-collapse:collapse;margin:24px 0;">
+              <tr>
+                <td style="padding-right:8px;">
+                  <a href="${confirmUrl}" style="display:block;text-align:center;padding:14px;background:#16a34a;color:white;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">✅ Bekreft time</a>
+                </td>
+                <td style="padding-left:8px;">
+                  <a href="${rejectUrl}" style="display:block;text-align:center;padding:14px;background:#dc2626;color:white;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">❌ Avvis</a>
+                </td>
+              </tr>
             </table>
 
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
-
-            <h3 style="font-size: 14px; color: #374151; margin-bottom: 8px;">👤 Pasientinfo</h3>
-            <table style="font-size: 14px; color: #374151; width: 100%;">
-              <tr><td style="padding: 4px 12px 4px 0; font-weight: 600; width: 120px;">Navn</td><td>${booking.name}</td></tr>
-              <tr><td style="padding: 4px 12px 4px 0; font-weight: 600;">Telefon</td><td><a href="tel:${booking.phone}">${booking.phone}</a></td></tr>
-              <tr><td style="padding: 4px 12px 4px 0; font-weight: 600;">E-post</td><td><a href="mailto:${booking.email}">${booking.email}</a></td></tr>
-            </table>
-
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
-            <p style="font-size: 13px; color: #6b7280; background: #f9fafb; padding: 12px; border-radius: 8px;">
-              ⚠️ <strong>Husk å ringe pasienten</strong> for å bekrefte timen. Bookingtidspunktet er valgt av pasienten selv og er ikke automatisk satt opp i kalendereren din ennå.
+            <p style="font-size:13px;color:#6b7280;background:#fef9c3;border:1px solid #fde68a;padding:12px;border-radius:8px;">
+              💡 Klikker du <strong>Bekreft</strong> får pasienten automatisk SMS-bekreftelse. Klikker du <strong>Avvis</strong> prøver vi neste ledige ansatt automatisk.
             </p>
-            <p style="font-size: 12px; color: #9ca3af; margin-top: 16px;">Sendt automatisk fra SvarAI · ${new Date(booking.createdAt).toLocaleString("nb-NO", { timeZone: "Europe/Oslo" })}</p>
+            <p style="font-size:12px;color:#9ca3af;margin-top:16px;">Ref: ${booking.id} · Sendt automatisk fra SvarAI · ${new Date(booking.createdAt).toLocaleString("nb-NO", { timeZone: "Europe/Oslo" })}</p>
           </div>
         `,
       }),
@@ -252,11 +260,12 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    // Lagre i Supabase (hvis konfigurert)
+    // Lagre i Supabase som "pending" – venter på bekreftelse fra klinikken
     if (isSupabaseConfigured()) {
       await saveBooking({
         ...booking,
         clinic_id: clinicId,
+        status: "pending",
         staff_id: staffId ?? null,
         staff_name: staffName ?? null,
       }).catch(err => console.error("[booking] Supabase save feil:", err));
@@ -272,7 +281,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       booking,
-      message: `Timen din er mottatt! Klinikken vil kontakte deg på ${booking.phone} for å bekrefte.`,
+      message: `Forespørselen er sendt! Du vil motta en SMS når klinikken bekrefter timen din.`,
     });
 
   } catch (err: any) {

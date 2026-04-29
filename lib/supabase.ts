@@ -111,6 +111,33 @@ export async function getBookingsByDate(date: string) {
   );
 }
 
+export async function getBookingById(id: string) {
+  const rows = await supabaseFetch(
+    `/bookings?id=eq.${encodeURIComponent(id)}&limit=1`
+  );
+  return rows?.[0] ?? null;
+}
+
+export async function updateBooking(id: string, data: Record<string, any>) {
+  return supabaseFetch(`/bookings?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getActiveStaff(clinicId: string) {
+  return supabaseFetch(
+    `/clinic_staff?clinic_id=eq.${encodeURIComponent(clinicId)}&active=eq.true`
+  );
+}
+
+export async function getBookingsAtSlot(clinicId: string, date: string, time: string) {
+  // Finner bookinger som allerede er pending/confirmed for et gitt tidspunkt
+  return supabaseFetch(
+    `/bookings?clinic_id=eq.${encodeURIComponent(clinicId)}&date=eq.${encodeURIComponent(date)}&time=eq.${encodeURIComponent(time)}&status=in.(pending,confirmed)`
+  );
+}
+
 // ── Samtaler ───────────────────────────────────────────────────────────────
 
 export async function upsertConversation(data: {
