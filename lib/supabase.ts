@@ -125,3 +125,12 @@ export async function getConversations(clinicId: string, limit = 50) {
     `/conversations?clinic_id=eq.${encodeURIComponent(clinicId)}&order=created_at.desc&limit=${limit}`
   );
 }
+
+export async function deleteOldConversations(clinicId: string, daysToKeep = 30) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - daysToKeep);
+  return supabaseFetch(
+    `/conversations?clinic_id=eq.${encodeURIComponent(clinicId)}&created_at=lt.${cutoff.toISOString()}`,
+    { method: "DELETE" }
+  );
+}
