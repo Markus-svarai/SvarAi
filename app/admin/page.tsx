@@ -1015,16 +1015,49 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
                 <p className="text-xs text-green-600 mt-1">Alle samtaler endte i booking eller viderehenvisning. Bra jobba!</p>
               </div>
             ) : (
-              <div className="rounded-xl border border-ink-100 bg-white overflow-hidden">
-                {conversations.filter(c => !c.ended_in_booking && !c.has_unanswered && c.messages.some(m => m.role === "user")).slice(0, 5).map((c, i, arr) => (
-                  <div key={c.id} className={`flex items-center gap-3 px-4 py-3 ${i < arr.length - 1 ? "border-b border-ink-100" : ""}`}>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-ink-800 truncate">"{c.messages.find(m => m.role === "user")?.content ?? "—"}"</p>
-                      <p className="text-xs text-ink-400 mt-0.5">{fmtCreated(c.created_at)} · {c.messages.length} melding{c.messages.length !== 1 ? "er" : ""}</p>
+              <div className="space-y-2">
+                {conversations.filter(c => !c.ended_in_booking && !c.has_unanswered && c.messages.some(m => m.role === "user")).slice(0, 5).map(c => {
+                  const isOpen = expanded === c.id;
+                  return (
+                    <div key={c.id} className="rounded-xl border border-ink-100 bg-white overflow-hidden">
+                      <button
+                        onClick={() => setExpanded(isOpen ? null : c.id)}
+                        className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-ink-50 transition"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-ink-800 truncate">"{c.messages.find(m => m.role === "user")?.content ?? "—"}"</p>
+                          <p className="text-xs text-ink-400 mt-0.5">{fmtCreated(c.created_at)} · {c.messages.length} melding{c.messages.length !== 1 ? "er" : ""}</p>
+                        </div>
+                        <svg className={`h-4 w-4 text-ink-400 transition-transform shrink-0 ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {isOpen && (
+                        <div className="border-t border-ink-100 px-4 py-3 space-y-2 bg-ink-50/40 max-h-72 overflow-y-auto">
+                          {c.messages.map((m, i) => (
+                            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                              <div className={`max-w-xs rounded-xl px-3 py-2 text-xs ${
+                                m.role === "user"
+                                  ? "bg-ink-900 text-white rounded-br-sm"
+                                  : "bg-white border border-ink-100 text-ink-700 rounded-bl-sm"
+                              }`}>
+                                {m.content}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
-                {abandoned > 5 && <div className="px-4 py-2 border-t border-ink-100 text-xs text-ink-400">+ {abandoned - 5} til</div>}
+                  );
+                })}
+                {abandoned > 5 && (
+                  <button
+                    onClick={() => setView("list")}
+                    className="w-full px-4 py-2.5 rounded-xl border border-ink-100 bg-white text-xs text-ink-500 hover:bg-ink-50 transition text-center"
+                  >
+                    + {abandoned - 5} til — se alle samtaler
+                  </button>
+                )}
               </div>
             )}
           </div>
