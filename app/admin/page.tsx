@@ -955,7 +955,7 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
 
   const total = conversations.length;
   const booked = conversations.filter(c => c.ended_in_booking).length;
-  const abandoned = conversations.filter(c => c.messages.length < 3).length;
+  const abandoned = conversations.filter(c => !c.ended_in_booking && !c.has_unanswered && c.messages.some(m => m.role === "user")).length;
   const calledInstead = conversations.filter(c => c.has_unanswered).length;
   const bookingRate = total > 0 ? Math.round((booked / total) * 100) : 0;
   const abandonedRate = total > 0 ? Math.round((abandoned / total) * 100) : 0;
@@ -988,10 +988,10 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
           <div className={`text-2xl font-bold ${bookingRate > 0 ? "text-green-700" : "text-ink-900"}`}>{bookingRate}%</div>
           <div className={`text-xs mt-0.5 ${bookingRate > 0 ? "text-green-600" : "text-ink-500"}`}>Endte i booking</div>
         </div>
-        <div className={`rounded-xl border p-4 text-center ${abandonedRate > 30 ? "border-amber-100 bg-amber-50" : "border-ink-100 bg-white"}`}>
-          <div className={`text-2xl font-bold ${abandonedRate > 30 ? "text-amber-700" : "text-ink-900"}`}>{abandoned}</div>
-          <div className={`text-xs mt-0.5 ${abandonedRate > 30 ? "text-amber-600" : "text-ink-500"}`}>Avbrutte samtaler</div>
-          <div className="text-xs text-ink-400 mt-0.5">under 3 meldinger</div>
+        <div className={`rounded-xl border p-4 text-center ${abandoned > 0 ? "border-amber-100 bg-amber-50" : "border-ink-100 bg-white"}`}>
+          <div className={`text-2xl font-bold ${abandoned > 0 ? "text-amber-700" : "text-ink-900"}`}>{abandoned}</div>
+          <div className={`text-xs mt-0.5 ${abandoned > 0 ? "text-amber-600" : "text-ink-500"}`}>Informasjonssamtaler</div>
+          <div className="text-xs text-ink-400 mt-0.5">kan forbedres</div>
         </div>
         <div className={`rounded-xl border p-4 text-center ${calledInstead > 2 ? "border-red-100 bg-red-50" : "border-ink-100 bg-white"}`}>
           <div className={`text-2xl font-bold ${calledInstead > 2 ? "text-red-700" : "text-ink-900"}`}>{calledInstead}</div>
@@ -1003,20 +1003,20 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
       {view === "insights" ? (
         <div className="space-y-5">
 
-          {/* Avbrutte samtaler */}
+          {/* Informasjonssamtaler */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">Avbrutte samtaler</p>
-              {abandoned > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">{abandoned} stk</span>}
+              <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">Informasjonssamtaler</p>
+              {abandoned > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full bg-ink-100 text-ink-500 font-medium">{abandoned} stk</span>}
             </div>
             {abandoned === 0 ? (
               <div className="rounded-xl border border-dashed border-green-200 bg-green-50 py-5 text-center">
                 <p className="text-sm text-green-700 font-medium">Ingen avbrutte samtaler</p>
-                <p className="text-xs text-green-600 mt-1">Alle pasienter sendte minst 3 meldinger.</p>
+                <p className="text-xs text-green-600 mt-1">Alle samtaler endte i booking eller viderehenvisning. Bra jobba!</p>
               </div>
             ) : (
               <div className="rounded-xl border border-ink-100 bg-white overflow-hidden">
-                {conversations.filter(c => c.messages.length < 3).slice(0, 5).map((c, i, arr) => (
+                {conversations.filter(c => !c.ended_in_booking && !c.has_unanswered && c.messages.some(m => m.role === "user")).slice(0, 5).map((c, i, arr) => (
                   <div key={c.id} className={`flex items-center gap-3 px-4 py-3 ${i < arr.length - 1 ? "border-b border-ink-100" : ""}`}>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-ink-800 truncate">"{c.messages.find(m => m.role === "user")?.content ?? "—"}"</p>
