@@ -66,6 +66,60 @@ const DAYS = ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+type ChatCategory = {
+  label: string;
+  color: string;
+  hint: string;
+};
+
+function getChatCategory(messages: { role: string; content: string }[]): ChatCategory {
+  const userText = messages
+    .filter(m => m.role === "user")
+    .map(m => m.content.toLowerCase())
+    .join(" ");
+
+  if (/pris|kost|betale|betalte|kr |kroner|hva koster|hvor mye/.test(userText)) {
+    return {
+      label: "Prispørsmål",
+      color: "bg-blue-50 text-blue-700 border-blue-100",
+      hint: "Pasienten spurte om pris men booket ikke. Sjekk at alle priser er lagt inn i botens tjenesteoversikt — konkrete tall øker konvertering.",
+    };
+  }
+  if (/usikker|vurderer|kanskje|ikke sikker|vet ikke|tenker på|lurer på om/.test(userText)) {
+    return {
+      label: "Usikker pasient",
+      color: "bg-amber-50 text-amber-700 border-amber-100",
+      hint: "Pasienten var interessert men nølte. Lær boten å stille et avklarende spørsmål og guide dem trygt mot booking — f.eks. «Vil du at jeg hjelper deg å velge riktig time?»",
+    };
+  }
+  if (/time|bestille|booke|ledig|timebestilling|book|kan jeg få/.test(userText)) {
+    return {
+      label: "Ville booke",
+      color: "bg-purple-50 text-purple-700 border-purple-100",
+      hint: "Pasienten ønsket å booke men fullførte ikke. Sjekk at bookingflyten er tydelig og at ledige tider faktisk vises. Unngå for mange steg.",
+    };
+  }
+  if (/åpn|stengt|når er|åpningstid|tidspunkt|dere åpen|dere har/.test(userText)) {
+    return {
+      label: "Åpningstider",
+      color: "bg-slate-50 text-slate-600 border-slate-100",
+      hint: "Pasienten spurte om åpningstider. Sjekk at botens åpningstider er oppdaterte og presise — inkluder info om helger og unntak.",
+    };
+  }
+  if (/vondt|smerte|smerter|plage|problem|diagnos|hjelp med/.test(userText)) {
+    return {
+      label: "Symptomer/råd",
+      color: "bg-rose-50 text-rose-700 border-rose-100",
+      hint: "Pasienten beskrev symptomer men endte ikke i booking. Lær boten å vise empati og foreslå riktig tjeneste basert på det pasienten beskriver.",
+    };
+  }
+  return {
+    label: "Generelt",
+    color: "bg-ink-50 text-ink-500 border-ink-100",
+    hint: "Samtalen ga ikke booking. Se gjennom dialogen og vurder om boten svarte relevant og tydelig nok — legg gjerne til mer informasjon i botens instruksjoner.",
+  };
+}
+
 function fmtDate(iso: string) {
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString("nb-NO", { weekday: "short", day: "numeric", month: "short" });
@@ -1003,21 +1057,23 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
       {view === "insights" ? (
         <div className="space-y-5">
 
-          {/* Informasjonssamtaler */}
+          {/* Lær boten mer */}
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">Informasjonssamtaler</p>
-              {abandoned > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full bg-ink-100 text-ink-500 font-medium">{abandoned} stk</span>}
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">Lær boten mer</p>
+              {abandoned > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">{abandoned} stk</span>}
             </div>
+            <p className="text-xs text-ink-400 mb-3">Samtaler som ikke endte i booking — gå gjennom dem og forbedre boten</p>
             {abandoned === 0 ? (
               <div className="rounded-xl border border-dashed border-green-200 bg-green-50 py-5 text-center">
-                <p className="text-sm text-green-700 font-medium">Ingen avbrutte samtaler</p>
-                <p className="text-xs text-green-600 mt-1">Alle samtaler endte i booking eller viderehenvisning. Bra jobba!</p>
+                <p className="text-sm text-green-700 font-medium">Boten konverterer alt 🎉</p>
+                <p className="text-xs text-green-600 mt-1">Ingen samtaler uten booking denne perioden.</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {conversations.filter(c => !c.ended_in_booking && !c.has_unanswered && c.messages.some(m => m.role === "user")).slice(0, 5).map(c => {
                   const isOpen = expanded === c.id;
+                  const cat = getChatCategory(c.messages);
                   return (
                     <div key={c.id} className="rounded-xl border border-ink-100 bg-white overflow-hidden">
                       <button
@@ -1025,6 +1081,9 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
                         className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-ink-50 transition"
                       >
                         <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium shrink-0 ${cat.color}`}>{cat.label}</span>
+                          </div>
                           <p className="text-sm text-ink-800 truncate">"{c.messages.find(m => m.role === "user")?.content ?? "—"}"</p>
                           <p className="text-xs text-ink-400 mt-0.5">{fmtCreated(c.created_at)} · {c.messages.length} melding{c.messages.length !== 1 ? "er" : ""}</p>
                         </div>
@@ -1033,18 +1092,26 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
                         </svg>
                       </button>
                       {isOpen && (
-                        <div className="border-t border-ink-100 px-4 py-3 space-y-2 bg-ink-50/40 max-h-72 overflow-y-auto">
-                          {c.messages.map((m, i) => (
-                            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                              <div className={`max-w-xs rounded-xl px-3 py-2 text-xs ${
-                                m.role === "user"
-                                  ? "bg-ink-900 text-white rounded-br-sm"
-                                  : "bg-white border border-ink-100 text-ink-700 rounded-bl-sm"
-                              }`}>
-                                {m.content}
+                        <div className="border-t border-ink-100">
+                          {/* Forbedringshint */}
+                          <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex gap-2">
+                            <span className="text-amber-500 text-base shrink-0">💡</span>
+                            <p className="text-xs text-amber-800 leading-relaxed">{cat.hint}</p>
+                          </div>
+                          {/* Samtale */}
+                          <div className="px-4 py-3 space-y-2 bg-ink-50/40 max-h-64 overflow-y-auto">
+                            {c.messages.map((m, i) => (
+                              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                                <div className={`max-w-xs rounded-xl px-3 py-2 text-xs ${
+                                  m.role === "user"
+                                    ? "bg-ink-900 text-white rounded-br-sm"
+                                    : "bg-white border border-ink-100 text-ink-700 rounded-bl-sm"
+                                }`}>
+                                  {m.content}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
