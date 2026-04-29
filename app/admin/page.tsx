@@ -1066,22 +1066,41 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
               <div className="space-y-2">
                 {conversations.slice(0, 5).map(c => {
                   const firstMsg = c.messages.find(m => m.role === "user")?.content ?? "—";
+                  const isOpen = expanded === c.id;
                   return (
-                    <button
-                      key={c.id}
-                      onClick={() => { setView("list"); setExpanded(c.id); setTimeout(() => document.getElementById(`conv-${c.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 100); }}
-                      className="w-full text-left rounded-xl border border-ink-100 bg-white px-4 py-3 flex items-center gap-3 hover:bg-ink-50 transition cursor-pointer"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-ink-700 truncate">{firstMsg}</p>
-                        <p className="text-xs text-ink-400 mt-0.5">{fmtCreated(c.created_at)} · {c.messages.length} meldinger</p>
-                      </div>
-                      <div className="flex gap-1.5 shrink-0">
-                        {c.ended_in_booking && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100">Booking</span>}
-                        {c.has_unanswered && <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100">Ubesvart</span>}
-                        <svg className="h-3.5 w-3.5 text-ink-300 shrink-0 self-center" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                      </div>
-                    </button>
+                    <div key={c.id} className="rounded-xl border border-ink-100 bg-white overflow-hidden">
+                      <button
+                        onClick={() => setExpanded(isOpen ? null : c.id)}
+                        className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-ink-50 transition"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-ink-700 truncate">{firstMsg}</p>
+                          <p className="text-xs text-ink-400 mt-0.5">{fmtCreated(c.created_at)} · {c.messages.length} meldinger</p>
+                        </div>
+                        <div className="flex gap-1.5 shrink-0 items-center">
+                          {c.ended_in_booking && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100">Booking</span>}
+                          {c.has_unanswered && <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100">Ubesvart</span>}
+                          <svg className={`h-4 w-4 text-ink-400 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </button>
+                      {isOpen && (
+                        <div className="border-t border-ink-100 px-4 py-3 space-y-2 bg-ink-50/40 max-h-72 overflow-y-auto">
+                          {c.messages.map((m, i) => (
+                            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                              <div className={`max-w-xs rounded-xl px-3 py-2 text-xs ${
+                                m.role === "user"
+                                  ? "bg-ink-900 text-white rounded-br-sm"
+                                  : "bg-white border border-ink-100 text-ink-700 rounded-bl-sm"
+                              }`}>
+                                {m.content}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
