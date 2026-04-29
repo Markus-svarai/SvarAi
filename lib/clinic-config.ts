@@ -46,7 +46,7 @@ export const clinicConfig: ClinicConfig = {
   },
   contact: {
     phone: "+47 22 00 11 22",
-    email: "post@dinklinikk.no",
+    email: "",
     website: "www.dinklinikk.no",
   },
   openingHours: [
