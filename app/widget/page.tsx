@@ -200,7 +200,7 @@ function InfoForm({ date, time, dateLabel, brandColor, loading, onSubmit, onCanc
     padding: "9px 12px",
     borderRadius: 8,
     border: "1px solid #e5e7eb",
-    fontSize: 13,
+    fontSize: 16, // 16px prevents iOS auto-zoom
     outline: "none",
     background: "#fff",
     boxSizing: "border-box",
@@ -427,7 +427,8 @@ export default function WidgetPage() {
 
   return (
     <div style={{
-      display: "flex", flexDirection: "column", height: "100vh",
+      display: "flex", flexDirection: "column",
+      height: "100vh", height: "100dvh" as any,
       fontFamily: "system-ui, -apple-system, sans-serif",
       background: "#ffffff", overflow: "hidden",
     }}>
@@ -458,6 +459,7 @@ export default function WidgetPage() {
       {/* Messages */}
       <div ref={scrollContainerRef} style={{
         flex: 1, overflowY: "auto",
+        WebkitOverflowScrolling: "touch" as any, // smooth scroll on iOS
         padding: "16px 12px 8px",
         display: "flex", flexDirection: "column", gap: 10,
       }}>
@@ -552,7 +554,9 @@ export default function WidgetPage() {
       {/* Input (kun synlig når ikke i booking-flyt) */}
       {showInput && (
         <div style={{
-          padding: "8px 12px 12px", borderTop: "1px solid #f0f0f0",
+          padding: "8px 12px 12px",
+          paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+          borderTop: "1px solid #f0f0f0",
           display: "flex", gap: 8, flexShrink: 0,
         }}>
           <input
@@ -563,7 +567,8 @@ export default function WidgetPage() {
             placeholder="Skriv en melding…"
             style={{
               flex: 1, padding: "9px 14px", borderRadius: 24,
-              border: "1px solid #e5e7eb", fontSize: 13,
+              border: "1px solid #e5e7eb",
+              fontSize: 16, // 16px prevents iOS auto-zoom
               outline: "none", background: "#fafafa",
             }}
             onFocus={e => { e.target.style.borderColor = brandColor; e.target.style.background = "#fff"; }}
@@ -601,11 +606,16 @@ export default function WidgetPage() {
           to   { opacity: 1; }
         }
         * { box-sizing: border-box; }
-        body { margin: 0; }
+        html, body { margin: 0; height: 100%; overflow: hidden; }
         .booking-panel { animation: slideUp 0.22s ease; }
         .msg-bubble { animation: fadeIn 0.18s ease; }
-        button { transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease; }
+        button {
+          transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+          touch-action: manipulation; /* removes 300ms tap delay on mobile */
+          -webkit-tap-highlight-color: transparent;
+        }
         input:focus { outline: none; }
+        input { -webkit-appearance: none; } /* iOS input styling reset */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
