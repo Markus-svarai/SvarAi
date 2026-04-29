@@ -24,6 +24,48 @@ type Booking = {
   createdAt: string;
 };
 
+// Genererer .ics kalenderfil som base64 for vedlegg i e-post
+function generateICS(booking: Booking, durationMinutes: number, clinicName: string): string {
+  // Parse dato og tid i norsk tidssone (Europe/Oslo)
+  const [year, month, day] = booking.date.split("-").map(Number);
+  const [hour, minute] = booking.time.split(":").map(Number);
+
+  // Bygg start- og sluttid som lokal tid med TZID
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dtStart = `${year}${pad(month)}${pad(day)}T${pad(hour)}${pad(minute)}00`;
+  const endDate = new Date(year, month - 1, day, hour, minute + durationMinutes);
+  const dtEnd = `${endDate.getFullYear()}${pad(endDate.getMonth() + 1)}${pad(endDate.getDate())}T${pad(endDate.getHours())}${pad(endDate.getMinutes())}00`;
+
+  const uid = `${booking.id}@svarai.no`;
+  const now = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//SvarAI//SvarAI Booking//NO",
+    "CALSCALE:GREGORIAN",
+    "METHOD:REQUEST",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${now}`,
+    `DTSTART;TZID=Europe/Oslo:${dtStart}`,
+    `DTEND;TZID=Europe/Oslo:${dtEnd}`,
+    `SUMMARY:${booking.name} – ${booking.serviceName}`,
+    `DESCRIPTION:Pasient: ${booking.name}\\nTelefon: ${booking.phone}\\nE-post: ${booking.email}\\nBookingnr: ${booking.id}`,
+    `LOCATION:${clinicName}`,
+    `STATUS:TENTATIVE`,
+    `BEGIN:VALARM`,
+    `TRIGGER:-PT60M`,
+    `ACTION:DISPLAY`,
+    `DESCRIPTION:Påminnelse: ${booking.name} – ${booking.serviceName}`,
+    `END:VALARM`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+
+  return Buffer.from(ics).toString("base64");
+}
+
 // Gjør dato mer lesbar: "2026-04-28" → "mandag 28. april 2026"
 function formatDate(iso: string): string {
   const d = new Date(iso + "T00:00:00");
@@ -86,10 +128,11 @@ async function sendPatientReceiptEmail(
   }
 }
 
-// Sender e-post til klinikken med all booking-info
+// Sender e-post til klinikken med all booking-info + .ics vedlegg
 async function sendBookingEmail(
   booking: Booking,
   servicePriceNok: number,
+  serviceDurationMinutes: number,
   clinicName: string,
   notifyEmail: string
 ): Promise<boolean> {
@@ -109,6 +152,12 @@ async function sendBookingEmail(
         from: "SvarAI <hei@svarai.no>",
         to: [notifyEmail],
         subject: `📅 Ny booking: ${booking.serviceName} – ${booking.name}`,
+        attachments: [
+          {
+            filename: `booking-${booking.id}.ics`,
+            content: generateICS(booking, serviceDurationMinutes, clinicName),
+          },
+        ],
         html: `
           <div style="font-family: system-ui, sans-serif; max-width: 520px;">
             <h2 style="color: #1a1a2e; margin-bottom: 4px;">Ny booking fra ${clinicName}</h2>
@@ -216,7 +265,7 @@ export async function POST(req: NextRequest) {
     // Send e-poster parallelt: klinikk + pasient
     const notifyEmail = config.contact.email || NOTIFY_EMAIL;
     await Promise.all([
-      sendBookingEmail(booking, service.priceNok, config.name, notifyEmail),
+      sendBookingEmail(booking, service.priceNok, service.durationMinutes, config.name, notifyEmail),
       sendPatientReceiptEmail(booking, config.name, config.contact.phone),
     ]);
 
