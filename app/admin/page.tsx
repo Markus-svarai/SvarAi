@@ -1067,16 +1067,21 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
                 {conversations.slice(0, 5).map(c => {
                   const firstMsg = c.messages.find(m => m.role === "user")?.content ?? "—";
                   return (
-                    <div key={c.id} className="rounded-xl border border-ink-100 bg-white px-4 py-3 flex items-center gap-3">
+                    <button
+                      key={c.id}
+                      onClick={() => { setView("list"); setExpanded(c.id); setTimeout(() => document.getElementById(`conv-${c.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 100); }}
+                      className="w-full text-left rounded-xl border border-ink-100 bg-white px-4 py-3 flex items-center gap-3 hover:bg-ink-50 transition cursor-pointer"
+                    >
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-ink-700 truncate">{firstMsg}</p>
                         <p className="text-xs text-ink-400 mt-0.5">{fmtCreated(c.created_at)} · {c.messages.length} meldinger</p>
                       </div>
                       <div className="flex gap-1.5 shrink-0">
                         {c.ended_in_booking && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100">Booking</span>}
-                        {c.has_unanswered && <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100">Ringte oss</span>}
+                        {c.has_unanswered && <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100">Ubesvart</span>}
+                        <svg className="h-3.5 w-3.5 text-ink-300 shrink-0 self-center" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -1093,7 +1098,7 @@ function ConversationsTab({ clinicId }: { clinicId: string }) {
               const firstMsg = c.messages.find(m => m.role === "user")?.content ?? "—";
               const isOpen = expanded === c.id;
               return (
-                <div key={c.id} className="rounded-xl border border-ink-100 bg-white overflow-hidden">
+                <div key={c.id} id={`conv-${c.id}`} className="rounded-xl border border-ink-100 bg-white overflow-hidden">
                   <button onClick={() => setExpanded(isOpen ? null : c.id)}
                     className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-ink-50 transition">
                     <div className="flex-1 min-w-0">
