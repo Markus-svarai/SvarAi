@@ -263,11 +263,19 @@ export async function POST(req: NextRequest) {
     // Lagre i Supabase som "pending" – venter på bekreftelse fra klinikken
     if (isSupabaseConfigured()) {
       await saveBooking({
-        ...booking,
+        id: booking.id,
+        service_id: booking.serviceId,
+        service_name: booking.serviceName,
+        date: booking.date,
+        time: booking.time,
+        name: booking.name,
+        phone: booking.phone,
+        email: booking.email,
         clinic_id: clinicId,
         status: "pending",
         staff_id: staffId ?? null,
         staff_name: staffName ?? null,
+        created_at: booking.createdAt,
       }).catch(err => console.error("[booking] Supabase save feil:", err));
     }
 
