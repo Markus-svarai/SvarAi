@@ -50,8 +50,9 @@ export async function POST(req: NextRequest) {
     if (!clinic_id || !name?.trim())
       return NextResponse.json({ error: "Klinikk-ID og navn er påkrevd." }, { status: 400 });
 
-    const { ical_url } = body;
+    const { ical_url, email } = body;
     const icalValue = ical_url?.trim() || null;
+    const emailValue = email?.trim() || null;
 
     if (id) {
       const updated = await sb(`/clinic_staff?id=eq.${encodeURIComponent(id)}`, {
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           name: name.trim(),
           title: title?.trim() ?? null,
+          email: emailValue,
           active: active ?? true,
           ical_url: icalValue,
         }),
@@ -71,6 +73,7 @@ export async function POST(req: NextRequest) {
           clinic_id,
           name: name.trim(),
           title: title?.trim() ?? null,
+          email: emailValue,
           active: true,
           ical_url: icalValue,
         }),

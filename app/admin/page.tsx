@@ -58,6 +58,7 @@ type StaffMember = {
   clinic_id: string;
   name: string;
   title: string | null;
+  email: string | null;
   active: boolean;
   ical_url: string | null;
 };
@@ -404,7 +405,7 @@ function StaffTab({ clinicId }: { clinicId: string }) {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
-  const [form, setForm] = useState({ name: "", title: "", ical_url: "" });
+  const [form, setForm] = useState({ name: "", title: "", email: "", ical_url: "" });
 
   useEffect(() => {
     apiFetch(`/api/admin/staff?clinicId=${encodeURIComponent(clinicId)}`)
@@ -415,13 +416,13 @@ function StaffTab({ clinicId }: { clinicId: string }) {
 
   function openNew() {
     setEditing(null);
-    setForm({ name: "", title: "", ical_url: "" });
+    setForm({ name: "", title: "", email: "", ical_url: "" });
     setShowForm(true);
   }
 
   function openEdit(s: StaffMember) {
     setEditing(s);
-    setForm({ name: s.name, title: s.title ?? "", ical_url: s.ical_url ?? "" });
+    setForm({ name: s.name, title: s.title ?? "", email: s.email ?? "", ical_url: s.ical_url ?? "" });
     setShowForm(true);
   }
 
@@ -518,6 +519,19 @@ function StaffTab({ clinicId }: { clinicId: string }) {
               />
             </label>
             <label className="block sm:col-span-2">
+              <span className="text-xs font-medium text-ink-700">E-post</span>
+              <input
+                type="email"
+                value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                placeholder="f.eks. hansen@klinikken.no"
+                className="mt-1 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              />
+              <p className="mt-1 text-xs text-ink-400">
+                Bekreft/Avvis-varsler sendes til denne e-posten når ansatt er tilgjengelig.
+              </p>
+            </label>
+            <label className="block sm:col-span-2">
               <span className="text-xs font-medium text-ink-700">Kalender-URL (iCal)</span>
               <input
                 type="url"
@@ -553,6 +567,7 @@ function StaffTab({ clinicId }: { clinicId: string }) {
                 <div>
                   <div className="text-sm font-semibold text-ink-900">{s.name}</div>
                   {s.title && <div className="text-xs text-ink-500">{s.title}</div>}
+                  {s.email && <div className="text-xs text-ink-400">{s.email}</div>}
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.active ? "bg-green-50 text-green-700" : "bg-ink-100 text-ink-500"}`}>
                   {s.active ? "Aktiv" : "Inaktiv"}
