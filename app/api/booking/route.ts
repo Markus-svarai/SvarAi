@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { formatNok } from "@/lib/clinic-config";
 import { getClinicData } from "@/lib/get-clinic-data";
-import { saveBooking, isSupabaseConfigured } from "@/lib/supabase";
+import { saveBooking, isSupabaseConfigured, getActiveStaff, getBookingsAtSlot } from "@/lib/supabase";
 import { generateToken } from "@/lib/booking-token";
 
 export const runtime = "nodejs";
@@ -246,6 +246,25 @@ export async function POST(req: NextRequest) {
 
     const service = config.services.find(s => s.id === serviceId)!;
 
+    // Auto-tildel ledig ansatt hvis ikke spesifisert og Supabase er konfigurert
+    let assignedStaffId = staffId ?? null;
+    let assignedStaffName = staffName ?? null;
+    let assignedStaffEmail: string | null = null;
+
+    if (isSupabaseConfigured() && !assignedStaffId) {
+      const [allStaff, takenBookings] = await Promise.all([
+        getActiveStaff(clinicId).catch(() => [] as any[]),
+        getBookingsAtSlot(clinicId, date, time).catch(() => [] as any[]),
+      ]);
+      const takenIds = new Set((takenBookings ?? []).map((b: any) => b.staff_id).filter(Boolean));
+      const available = (allStaff ?? []).find((s: any) => !takenIds.has(s.id));
+      if (available) {
+        assignedStaffId = available.id;
+        assignedStaffName = available.name;
+        assignedStaffEmail = available.email ?? null;
+      }
+    }
+
     const booking: Booking = {
       id: `SVR-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
       serviceId,
@@ -255,8 +274,8 @@ export async function POST(req: NextRequest) {
       name: name.trim(),
       phone: phone.trim(),
       email: email.trim(),
-      staffId: staffId ?? undefined,
-      staffName: staffName ?? undefined,
+      staffId: assignedStaffId ?? undefined,
+      staffName: assignedStaffName ?? undefined,
       createdAt: new Date().toISOString(),
     };
 
@@ -273,17 +292,16 @@ export async function POST(req: NextRequest) {
         email: booking.email,
         clinic_id: clinicId,
         status: "pending",
-        staff_id: staffId ?? null,
-        staff_name: staffName ?? null,
+        staff_id: assignedStaffId,
+        staff_name: assignedStaffName,
         created_at: booking.createdAt,
       }).catch(err => console.error("[booking] Supabase save feil:", err));
     }
 
     // Send e-poster parallelt: klinikk + pasient
-    // Demo-klinikk bruker alltid NOTIFY_EMAIL (env var eller fallback til Markus sin Gmail)
-    const notifyEmail = clinicId === "demo"
-      ? NOTIFY_EMAIL
-      : (config.contact.email || NOTIFY_EMAIL);
+    // Hvis ansatt har e-post → send til ansatt. Ellers → klinikk-epost eller NOTIFY_EMAIL
+    const notifyEmail = assignedStaffEmail
+      ?? (clinicId === "demo" ? NOTIFY_EMAIL : (config.contact.email || NOTIFY_EMAIL));
     await Promise.all([
       sendBookingEmail(booking, service.priceNok, service.durationMinutes, config.name, notifyEmail),
       sendPatientReceiptEmail(booking, config.name, config.contact.phone),
