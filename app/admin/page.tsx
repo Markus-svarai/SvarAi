@@ -17,6 +17,7 @@ type Clinic = {
   contact_website: string;
   cancellation_policy: string;
   booking_lead_hours: number;
+  buffer_minutes: number;
   bot_instructions?: string;
   subscription_status?: string;
 };
@@ -939,8 +940,24 @@ function ClinicTab({ clinicId }: { clinicId: string }) {
                 onChange={e => set("booking_lead_hours", Number(e.target.value))}
                 className="mt-1 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
               />
+              <p className="mt-1 text-xs text-ink-400">Minimum antall timer i forveien en time kan bookes.</p>
             </label>
             <label className="block">
+              <span className="text-xs font-medium text-ink-700">Buffer-tid mellom timer (min)</span>
+              <select
+                value={form.buffer_minutes ?? 0}
+                onChange={e => set("buffer_minutes", Number(e.target.value))}
+                className="mt-1 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              >
+                <option value={0}>Ingen buffer</option>
+                <option value={15}>15 minutter</option>
+                <option value={30}>30 minutter</option>
+                <option value={45}>45 minutter</option>
+                <option value={60}>60 minutter</option>
+              </select>
+              <p className="mt-1 text-xs text-ink-400">Slingringstid etter hver time før neste kan bookes.</p>
+            </label>
+            <label className="block sm:col-span-2">
               <span className="text-xs font-medium text-ink-700">Avbestillingspolicy</span>
               <textarea
                 rows={2}
