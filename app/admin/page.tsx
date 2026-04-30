@@ -399,8 +399,6 @@ function BookingsTab({ clinicId }: { clinicId: string }) {
 
 // ── Arbeidsplan-editor per ansatt ──────────────────────────────────────────
 
-const DAYS = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"];
-
 type StaffDayHours = { day: string; open: string; close: string; closed: boolean };
 
 function StaffHoursEditor({ staffId, staffName, onClose }: {
