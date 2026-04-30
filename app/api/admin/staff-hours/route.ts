@@ -36,9 +36,9 @@ export async function GET(req: NextRequest) {
     );
 
     // Returner alle 7 dager – fyll inn defaults for dager som mangler
-    const existing = new Map((rows ?? []).map((r: any) => [r.day, r]));
+    const existing = new Map<string, any>((rows ?? []).map((r: any) => [r.day, r]));
     const result = DAYS.map(day => {
-      const row = existing.get(day);
+      const row: any = existing.get(day);
       return row
         ? { day, open: row.open ?? "08:00", close: row.close ?? "16:00", closed: row.closed ?? false }
         : { day, open: "08:00", close: "16:00", closed: true }; // default: stengt
