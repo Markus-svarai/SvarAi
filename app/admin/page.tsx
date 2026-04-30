@@ -397,6 +397,108 @@ function BookingsTab({ clinicId }: { clinicId: string }) {
   );
 }
 
+// ── Arbeidsplan-editor per ansatt ──────────────────────────────────────────
+
+const DAYS = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"];
+
+type StaffDayHours = { day: string; open: string; close: string; closed: boolean };
+
+function StaffHoursEditor({ staffId, staffName, onClose }: {
+  staffId: string;
+  staffName: string;
+  onClose: () => void;
+}) {
+  const [hours, setHours] = useState<StaffDayHours[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    apiFetch(`/api/admin/staff-hours?staffId=${encodeURIComponent(staffId)}`)
+      .then(data => setHours(data ?? []))
+      .finally(() => setLoading(false));
+  }, [staffId]);
+
+  function update(day: string, field: keyof StaffDayHours, value: string | boolean) {
+    setHours(prev => prev.map(h => h.day === day ? { ...h, [field]: value } : h));
+    setSaved(false);
+  }
+
+  async function save() {
+    setSaving(true);
+    setSaved(false);
+    try {
+      await apiFetch("/api/admin/staff-hours", {
+        method: "POST",
+        body: JSON.stringify({ staffId, hours }),
+      });
+      setSaved(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return (
+    <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/40 p-4">
+      <div className="text-xs text-ink-500">Laster timeplan…</div>
+    </div>
+  );
+
+  return (
+    <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/30 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold text-ink-900">Arbeidsplan – {staffName}</p>
+        <button onClick={onClose} className="text-xs text-ink-400 hover:text-ink-700">✕ Lukk</button>
+      </div>
+      <div className="space-y-2">
+        {hours.map(h => (
+          <div key={h.day} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 border ${h.closed ? "bg-ink-50 border-ink-100" : "bg-white border-ink-200"}`}>
+            <div className="w-20 text-xs font-semibold text-ink-700">{h.day}</div>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!h.closed}
+                onChange={e => update(h.day, "closed", !e.target.checked)}
+                className="rounded"
+              />
+              <span className={`text-xs ${h.closed ? "text-ink-400" : "text-ink-700"}`}>
+                {h.closed ? "Fri" : "Jobber"}
+              </span>
+            </label>
+            {!h.closed && (
+              <>
+                <input
+                  type="time"
+                  value={h.open}
+                  onChange={e => update(h.day, "open", e.target.value)}
+                  className="text-xs border border-ink-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand-500"
+                />
+                <span className="text-xs text-ink-400">–</span>
+                <input
+                  type="time"
+                  value={h.close}
+                  onChange={e => update(h.day, "close", e.target.value)}
+                  className="text-xs border border-ink-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand-500"
+                />
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-3 mt-3">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="rounded-lg bg-ink-900 text-white text-xs font-medium px-4 py-2 hover:bg-ink-800 disabled:opacity-60"
+        >
+          {saving ? "Lagrer…" : "Lagre timeplan"}
+        </button>
+        {saved && <span className="text-xs text-green-600 font-medium">✓ Lagret</span>}
+      </div>
+    </div>
+  );
+}
+
 // ── Tab: Ansatte ───────────────────────────────────────────────────────────
 
 function StaffTab({ clinicId }: { clinicId: string }) {
@@ -407,6 +509,7 @@ function StaffTab({ clinicId }: { clinicId: string }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
   const [form, setForm] = useState({ name: "", title: "", email: "", ical_url: "" });
+  const [expandedHours, setExpandedHours] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch(`/api/admin/staff?clinicId=${encodeURIComponent(clinicId)}`)
@@ -560,36 +663,51 @@ function StaffTab({ clinicId }: { clinicId: string }) {
       ) : (
         <div className="space-y-2">
           {staff.map(s => (
-            <div key={s.id} className={`rounded-xl border bg-white p-4 flex items-center justify-between gap-4 ${s.active ? "border-ink-100" : "border-ink-100 opacity-60"}`}>
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-ink-100 flex items-center justify-center text-sm font-semibold text-ink-700">
-                  {s.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-ink-900">{s.name}</div>
-                  {s.title && <div className="text-xs text-ink-500">{s.title}</div>}
-                  {s.email && <div className="text-xs text-ink-400">{s.email}</div>}
-                </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.active ? "bg-green-50 text-green-700" : "bg-ink-100 text-ink-500"}`}>
-                  {s.active ? "Aktiv" : "Inaktiv"}
-                </span>
-                {s.ical_url && (
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700">
-                    📅 Kalender synket
+            <div key={s.id}>
+              <div className={`rounded-xl border bg-white p-4 flex items-center justify-between gap-4 ${s.active ? "border-ink-100" : "border-ink-100 opacity-60"}`}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-9 w-9 rounded-full bg-ink-100 flex items-center justify-center text-sm font-semibold text-ink-700 shrink-0">
+                    {s.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-ink-900">{s.name}</div>
+                    {s.title && <div className="text-xs text-ink-500">{s.title}</div>}
+                    {s.email && <div className="text-xs text-ink-400 truncate">{s.email}</div>}
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${s.active ? "bg-green-50 text-green-700" : "bg-ink-100 text-ink-500"}`}>
+                    {s.active ? "Aktiv" : "Inaktiv"}
                   </span>
-                )}
+                  {s.ical_url && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700 shrink-0">
+                      📅 Synket
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => setExpandedHours(expandedHours === s.id ? null : s.id)}
+                    className={`text-xs border rounded-lg px-2.5 py-1.5 transition ${expandedHours === s.id ? "bg-brand-50 text-brand-700 border-brand-200" : "text-ink-600 hover:text-ink-900 border-ink-200 hover:bg-ink-50"}`}
+                  >
+                    🗓 Timeplan
+                  </button>
+                  <button onClick={() => openEdit(s)} className="text-xs text-ink-600 hover:text-ink-900 border border-ink-200 rounded-lg px-2.5 py-1.5 hover:bg-ink-50 transition">
+                    Rediger
+                  </button>
+                  <button onClick={() => toggleActive(s)} className="text-xs text-ink-600 hover:text-ink-900 border border-ink-200 rounded-lg px-2.5 py-1.5 hover:bg-ink-50 transition">
+                    {s.active ? "Deaktiver" : "Aktiver"}
+                  </button>
+                  <button onClick={() => remove(s.id)} className="text-xs text-red-600 hover:text-red-800 border border-red-100 rounded-lg px-2.5 py-1.5 hover:bg-red-50 transition">
+                    Slett
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2 shrink-0">
-                <button onClick={() => openEdit(s)} className="text-xs text-ink-600 hover:text-ink-900 border border-ink-200 rounded-lg px-2.5 py-1.5 hover:bg-ink-50 transition">
-                  Rediger
-                </button>
-                <button onClick={() => toggleActive(s)} className="text-xs text-ink-600 hover:text-ink-900 border border-ink-200 rounded-lg px-2.5 py-1.5 hover:bg-ink-50 transition">
-                  {s.active ? "Deaktiver" : "Aktiver"}
-                </button>
-                <button onClick={() => remove(s.id)} className="text-xs text-red-600 hover:text-red-800 border border-red-100 rounded-lg px-2.5 py-1.5 hover:bg-red-50 transition">
-                  Slett
-                </button>
-              </div>
+              {expandedHours === s.id && (
+                <StaffHoursEditor
+                  staffId={s.id}
+                  staffName={s.name}
+                  onClose={() => setExpandedHours(null)}
+                />
+              )}
             </div>
           ))}
         </div>
