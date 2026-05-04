@@ -271,10 +271,18 @@ async function findNextAvailable(
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-  const clinicId   = searchParams.get("clinicId")   ?? "demo";
-  const serviceId  = searchParams.get("serviceId")  ?? "";
-  const date       = searchParams.get("date")       ?? "";
-  const clinicType = searchParams.get("clinicType") ?? "";
+  const clinicId     = searchParams.get("clinicId")     ?? "demo";
+  const serviceId    = searchParams.get("serviceId")    ?? "";
+  const date         = searchParams.get("date")         ?? "";
+  const clinicType   = searchParams.get("clinicType")   ?? "";
+
+  // ── Test-overrides (kun i demo/dev) ──────────────────────────────────────
+  // ?blocked=2026-05-06        → tving stengt på denne datoen
+  // ?buffer=15                 → overstyr bufferMinutes
+  // ?minNotice=4               → overstyr minNoticeHours
+  const testBlocked  = searchParams.get("blocked") ?? null;   // YYYY-MM-DD
+  const testBuffer   = searchParams.get("buffer")  !== null ? Number(searchParams.get("buffer"))    : null;
+  const testNotice   = searchParams.get("minNotice") !== null ? Number(searchParams.get("minNotice")) : null;
 
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ error: "Ugyldig dato. Bruk YYYY-MM-DD." }, { status: 400 });
@@ -283,6 +291,14 @@ export async function GET(req: NextRequest) {
   const year = parseInt(date.slice(0, 4));
   const holidays = getNorwegianHolidays(year);
   const isDemo = clinicId === "demo" || !isSupabaseConfigured();
+
+  // Test-override: ?blocked=YYYY-MM-DD
+  if (testBlocked && testBlocked === date) {
+    return NextResponse.json({
+      date, slots: [], closed: true, reason: "blocked",
+      _test: "blocked override aktiv",
+    } satisfies AvailabilityResponse & { _test?: string });
+  }
 
   // ── Helligdag? ────────────────────────────────────────────────────────────
   if (holidays.has(date)) {
@@ -306,6 +322,10 @@ export async function GET(req: NextRequest) {
   if (isDemo) {
     const demoCfg = getDemoClinicConfig(clinicType);
 
+    // Test-overrides slår inn her
+    const effectiveBuffer  = testBuffer  !== null ? testBuffer  : demoCfg.bufferMinutes;
+    const effectiveNotice  = testNotice  !== null ? testNotice  : demoCfg.bookingLeadHours;
+
     // Sjekk blockedDates
     if (demoCfg.blockedDates.includes(date)) {
       return NextResponse.json({
@@ -317,7 +337,7 @@ export async function GET(req: NextRequest) {
     if (!dayH?.open || !dayH?.close) {
       const nextAvailable = await findNextAvailable(
         clinicId, clinicType, serviceId,
-        30, demoCfg.bufferMinutes, demoCfg.bookingLeadHours,
+        30, effectiveBuffer, effectiveNotice,
         holidays, demoCfg.blockedDates, date, true, demoCfg
       );
       return NextResponse.json({
@@ -332,14 +352,14 @@ export async function GET(req: NextRequest) {
 
     const slots = buildDemoSlots(
       dayH.open, dayH.close,
-      durationMinutes, demoCfg.bufferMinutes,
-      date, clinicType, demoCfg.bookingLeadHours
+      durationMinutes, effectiveBuffer,
+      date, clinicType, effectiveNotice
     );
 
     if (slots.length === 0) {
       const nextAvailable = await findNextAvailable(
         clinicId, clinicType, serviceId,
-        durationMinutes, demoCfg.bufferMinutes, demoCfg.bookingLeadHours,
+        durationMinutes, effectiveBuffer, effectiveNotice,
         holidays, demoCfg.blockedDates, date, true, demoCfg
       );
       return NextResponse.json({
