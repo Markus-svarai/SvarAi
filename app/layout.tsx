@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   description:
     "SvarAI svarer på henvendelser, håndterer bookinger og løfter kundeservicen din – 24/7. Bygget for klinikker i Norge.",
   metadataBase: new URL("https://svarai.no"),
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo-192.png",
+  },
   openGraph: {
     title: "SvarAI – AI-resepsjonist for klinikker",
     description:
@@ -21,12 +25,14 @@ export const metadata: Metadata = {
     siteName: "SvarAI",
     locale: "nb_NO",
     type: "website",
+    images: [{ url: "/logo.png", width: 512, height: 512, alt: "SvarAI" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "SvarAI – AI-resepsjonist for klinikker",
     description:
       "Svar på alle henvendelser og fyll kalenderen – uten å løfte telefonen.",
+    images: ["/logo.png"],
   },
   robots: {
     index: true,

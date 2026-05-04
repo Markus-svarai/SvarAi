@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 const links = [
   { href: "#problem", label: "Problemet" },
@@ -18,9 +19,7 @@ export default function Nav() {
       <div className="mx-auto max-w-6xl px-6 h-16 flex items-center justify-between">
         {/* Logo */}
         <a href="#" className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-ink-900 text-white flex items-center justify-center font-bold">
-            S
-          </div>
+          <Image src="/logo.png" alt="SvarAI" width={32} height={32} className="rounded-lg" />
           <span className="font-semibold text-ink-900 tracking-tight">SvarAI</span>
         </a>
 
