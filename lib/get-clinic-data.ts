@@ -3,10 +3,11 @@
  * Faller tilbake til hardkodet clinicConfig hvis Supabase ikke er satt opp
  * eller klinikken ikke finnes.
  */
-import { clinicConfig, ClinicConfig, ClinicService, OpeningHour } from "./clinic-config";
+import { clinicConfig, ClinicConfig, ClinicService, OpeningHour, getDemoClinicConfig } from "./clinic-config";
 import { getClinic, getServices, getHours, isSupabaseConfigured } from "./supabase";
 
-export async function getClinicData(clinicId: string): Promise<ClinicConfig> {
+export async function getClinicData(clinicId: string, clinicType?: string): Promise<ClinicConfig> {
+  if (clinicId === "demo") return getDemoClinicConfig(clinicType ?? "");
   if (!isSupabaseConfigured()) return clinicConfig;
 
   try {
@@ -51,6 +52,8 @@ export async function getClinicData(clinicId: string): Promise<ClinicConfig> {
       services: mappedServices.length > 0 ? mappedServices : clinicConfig.services,
       cancellationPolicy: clinic.cancellation_policy ?? clinicConfig.cancellationPolicy,
       bookingLeadHours: clinic.booking_lead_hours ?? clinicConfig.bookingLeadHours,
+      bufferMinutes: clinic.buffer_minutes ?? 0,
+      blockedDates: Array.isArray(clinic.blocked_dates) ? clinic.blocked_dates : [],
       botInstructions: clinic.bot_instructions ?? undefined,
     };
   } catch (err) {

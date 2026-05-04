@@ -49,15 +49,31 @@ function renderMarkdown(text: string) {
 
 // ── SlotPicker ─────────────────────────────────────────────────────────────
 
-function SlotPicker({ clinicId, serviceId, brandColor, onSelect }: {
+type SlotData = {
+  slots: { time: string }[];
+  closed?: boolean;
+  reason?: "holiday" | "weekend" | "blocked" | "no_hours" | "full";
+  holidayName?: string;
+  nextAvailable?: { date: string; time: string } | null;
+};
+
+function formatNextAvailable(next: { date: string; time: string }): string {
+  const d = new Date(next.date + "T12:00:00Z");
+  const weekday = d.toLocaleDateString("nb-NO", { weekday: "long", timeZone: "UTC" });
+  const day = d.toLocaleDateString("nb-NO", { day: "numeric", month: "short", timeZone: "UTC" });
+  return `${weekday} ${day} kl. ${next.time}`;
+}
+
+function SlotPicker({ clinicId, serviceId, clinicType, brandColor, onSelect }: {
   clinicId: string;
   serviceId: string;
+  clinicType: string;
   brandColor: string;
   onSelect: (date: string, time: string, dateLabel: string) => void;
 }) {
   const days = getUpcomingDays();
   const [dayIndex, setDayIndex] = useState(0);
-  const [slots, setSlots] = useState<string[]>([]);
+  const [slotData, setSlotData] = useState<SlotData>({ slots: [] });
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   const currentDay = days[dayIndex];
@@ -65,13 +81,17 @@ function SlotPicker({ clinicId, serviceId, brandColor, onSelect }: {
   useEffect(() => {
     if (!currentDay) return;
     setLoadingSlots(true);
-    setSlots([]);
-    fetch(`/api/availability?clinicId=${encodeURIComponent(clinicId)}&serviceId=${encodeURIComponent(serviceId)}&date=${encodeURIComponent(currentDay.value)}`)
+    setSlotData({ slots: [] });
+    fetch(
+      `/api/availability?clinicId=${encodeURIComponent(clinicId)}&serviceId=${encodeURIComponent(serviceId)}&date=${encodeURIComponent(currentDay.value)}&clinicType=${encodeURIComponent(clinicType)}`
+    )
       .then(r => r.json())
-      .then(data => setSlots((data.slots ?? []).map((s: { time: string }) => s.time)))
-      .catch(() => setSlots([]))
+      .then(data => setSlotData(data))
+      .catch(() => setSlotData({ slots: [] }))
       .finally(() => setLoadingSlots(false));
-  }, [dayIndex, clinicId, serviceId, currentDay?.value]);
+  }, [dayIndex, clinicId, serviceId, clinicType, currentDay?.value]);
+
+  const slots = slotData.slots?.map((s: { time: string }) => s.time) ?? [];
 
   return (
     <div className="booking-panel" style={{
@@ -131,9 +151,32 @@ function SlotPicker({ clinicId, serviceId, brandColor, onSelect }: {
           </div>
         </div>
       ) : slots.length === 0 ? (
-        <p style={{ textAlign: "center", fontSize: 12, color: "#9ca3af", margin: "8px 0" }}>
-          Ingen ledige tider denne dagen — prøv en annen dag
-        </p>
+        <div style={{ textAlign: "center", padding: "8px 0" }}>
+          {slotData.reason === "holiday" ? (
+            <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>
+              🗓️ Klinikken er stengt — {slotData.holidayName ?? "helligdag"}
+            </p>
+          ) : slotData.reason === "weekend" || slotData.closed ? (
+            <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>
+              Klinikken er stengt denne dagen
+            </p>
+          ) : slotData.reason === "full" ? (
+            <>
+              <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>
+                Ingen ledige timer denne dagen
+              </p>
+              {slotData.nextAvailable && (
+                <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                  Neste ledige: {formatNextAvailable(slotData.nextAvailable)}
+                </p>
+              )}
+            </>
+          ) : (
+            <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>
+              Ingen ledige tider — prøv en annen dag
+            </p>
+          )}
+        </div>
       ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {slots.map(time => (
@@ -583,6 +626,7 @@ export default function WidgetPage() {
         <SlotPicker
           clinicId={clinicId}
           serviceId={booking.serviceId}
+          clinicType={clinicType}
           brandColor={brandColor}
           onSelect={handleSlotSelect}
         />
