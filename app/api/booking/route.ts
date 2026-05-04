@@ -298,6 +298,27 @@ export async function POST(req: NextRequest) {
       }).catch(err => console.error("[booking] Supabase save feil:", err));
     }
 
+    // Send event til Agent Imperie (Inngest) — non-blocking, best-effort
+    const inngestKey = process.env.INNGEST_EVENT_KEY;
+    if (inngestKey) {
+      fetch(`https://inn.gs/e/${inngestKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "svarai/booking.created",
+          data: {
+            bookingId: booking.id,
+            clinicId,
+            serviceName: booking.serviceName,
+            date: booking.date,
+            time: booking.time,
+            status: "pending",
+            createdAt: booking.createdAt,
+          },
+        }),
+      }).catch(err => console.error("[booking] Inngest send feil:", err));
+    }
+
     // Send e-poster parallelt: klinikk + pasient
     // Hvis ansatt har e-post → send til ansatt. Ellers → klinikk-epost eller NOTIFY_EMAIL
     const notifyEmail = assignedStaffEmail

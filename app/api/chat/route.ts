@@ -54,6 +54,48 @@ function tomorrowLabel(): string {
   return d.toLocaleDateString("nb-NO", { weekday: "long" });
 }
 
+// ── Demo system prompt (dynamic clinic type) ──────────────────────────────
+
+function buildDemoSystemPrompt(clinicType: string): string {
+  const type = clinicType.trim() || "klinikk";
+  return `Du er en vennlig resepsjonist-assistent for en ${type} i Norge.
+Din oppgave er å hjelpe pasienter med spørsmål og timebestilling.
+
+KLINIKK-INFO:
+- Type: ${type}
+- Åpningstider: Mandag–fredag: 08:00–16:00, Lørdag: 09:00–14:00, Søndag: Stengt
+- Avbestillingspolitikk: Avbestilling må skje senest 24 timer før timen
+
+PERSONLIGHETSREGLER:
+1. Svar alltid direkte på det pasienten faktisk spør om.
+2. Skriv som et vanlig menneske — kort, naturlig, uformelt men profesjonelt. Ikke bruk klisjéfraser som "Selvfølgelig!", "Flott valg!" eller "Ikke noe problem!".
+3. Bruk ALDRI emojis. Kun ren tekst.
+4. Aldri nevn at du er en AI eller chatbot med mindre pasienten spør direkte.
+5. Svar alltid på norsk.
+6. Hold svar korte — maks 2-3 setninger. Kom til poenget.
+
+GUIDE-REGEL:
+Du er resepsjonisten — du tar styring, ikke pasienten.
+Hjelp pasienten å forstå hva de trenger og book riktig time.
+Spør ETT enkelt guiding-spørsmål og gi 2-4 konkrete suggestions som knapper.
+
+BOOKING:
+Når tjenesten er avklart og pasienten vil booke, trigger start_booking med serviceId "konsultasjon".
+Si hvilken type time det er FØR du trigger booking. Eksempel: "Da setter vi opp en konsultasjon — la meg vise deg ledige tider."
+IKKE list opp tider i meldingen — UI-en viser dem automatisk.
+
+SVAR-FORMAT:
+Du MÅ alltid svare med gyldig JSON i dette formatet:
+{
+  "reply": "Melding til pasienten (støtter **bold** og linjeskift med \\n)",
+  "action": {"type": "start_booking", "serviceId": "konsultasjon"} eller null,
+  "suggestions": ["Alternativ 1", "Alternativ 2", "Alternativ 3"]
+}
+
+Suggestions skal være korte knapper tilpasset en ${type} (2-4 stykk).
+Svar KUN med JSON — ingen tekst rundt.`;
+}
+
 // ── Build system prompt ────────────────────────────────────────────────────
 
 function buildSystemPrompt(
@@ -242,6 +284,7 @@ export async function POST(req: NextRequest) {
     const message: string = body?.message ?? "";
     const history: ChatMessage[] = Array.isArray(body?.history) ? body.history : [];
     const clinicId: string = typeof body?.clinicId === "string" ? body.clinicId : "demo";
+    const clinicType: string = typeof body?.clinicType === "string" ? body.clinicType : "";
     const sessionId: string = typeof body?.sessionId === "string" ? body.sessionId : "";
 
     if (!message || typeof message !== "string") {
@@ -250,20 +293,28 @@ export async function POST(req: NextRequest) {
 
     const config = await getClinicData(clinicId);
 
-    // Hent ledige tider parallelt for de to vanligste tjenestene
-    const today = todayStr();
-    const tomorrow = tomorrowStr();
-    const mainServices = config.services.slice(0, 4).map(s => s.id);
+    // For demo with a custom clinicType, use a dynamic prompt — skip loading real slots
+    const isDemoWithType = clinicId === "demo" && clinicType.trim().length > 0;
 
-    const [todayResults, tomorrowResults] = await Promise.all([
-      Promise.all(mainServices.map(id => getAvailableSlots(clinicId, id, today).then(slots => ({ id, slots })))),
-      Promise.all(mainServices.map(id => getAvailableSlots(clinicId, id, tomorrow).then(slots => ({ id, slots })))),
-    ]);
+    let systemPrompt: string;
+    if (isDemoWithType) {
+      systemPrompt = buildDemoSystemPrompt(clinicType);
+    } else {
+      // Hent ledige tider parallelt for de to vanligste tjenestene
+      const today = todayStr();
+      const tomorrow = tomorrowStr();
+      const mainServices = config.services.slice(0, 4).map(s => s.id);
 
-    const todaySlots = Object.fromEntries(todayResults.map(r => [r.id, r.slots]));
-    const tomorrowSlots = Object.fromEntries(tomorrowResults.map(r => [r.id, r.slots]));
+      const [todayResults, tomorrowResults] = await Promise.all([
+        Promise.all(mainServices.map(id => getAvailableSlots(clinicId, id, today).then(slots => ({ id, slots })))),
+        Promise.all(mainServices.map(id => getAvailableSlots(clinicId, id, tomorrow).then(slots => ({ id, slots })))),
+      ]);
 
-    const systemPrompt = buildSystemPrompt(config, todaySlots, tomorrowSlots);
+      const todaySlots = Object.fromEntries(todayResults.map(r => [r.id, r.slots]));
+      const tomorrowSlots = Object.fromEntries(tomorrowResults.map(r => [r.id, r.slots]));
+
+      systemPrompt = buildSystemPrompt(config, todaySlots, tomorrowSlots);
+    }
 
     // Kall Claude — fallback til enkel feilmelding hvis API er nede
     let response: ChatResponse;

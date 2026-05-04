@@ -299,6 +299,7 @@ export default function WidgetPage() {
     ? new URLSearchParams(window.location.search)
     : new URLSearchParams();
   const clinicId = params.get("id") ?? "demo";
+  const clinicType = params.get("clinicType") ?? "";
   const brandColor = "#" + (params.get("color") ?? "1ea67e");
 
   const sessionId = useRef<string>(
@@ -343,7 +344,7 @@ export default function WidgetPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, history, clinicId, sessionId: sessionId.current }),
+        body: JSON.stringify({ message: trimmed, history, clinicId, clinicType, sessionId: sessionId.current }),
       });
       const data = await res.json();
 
