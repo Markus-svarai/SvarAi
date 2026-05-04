@@ -281,13 +281,59 @@ function InfoForm({ date, time, dateLabel, brandColor, loading, onSubmit, onCanc
   );
 }
 
+// ── Klinikk-konfig ─────────────────────────────────────────────────────────
+
+type ClinicConfig = {
+  greeting: string;
+  quickReplies: string[];
+};
+
+const CLINIC_CONFIG: Record<string, ClinicConfig> = {
+  tannklinikk: {
+    greeting: "Hei! Jeg er resepsjonisten på tannklinikken. Har du tannpine, vil bestille kontroll eller trenger en time?",
+    quickReplies: ["Jeg har vondt i en tann", "Bestille kontroll", "Akutt time", "Endre time"],
+  },
+  hudklinikk: {
+    greeting: "Hei! Jeg er resepsjonisten på hudklinikken. Kan jeg hjelpe deg med booking, hudanalyse eller spørsmål om behandlinger?",
+    quickReplies: ["Bestille konsultasjon", "Hudanalyse", "Akne / uren hud", "Priser på behandling"],
+  },
+  fysioterapi: {
+    greeting: "Hei! Jeg er resepsjonisten på fysioterapiklinikken. Har du smerter eller ønsker du å bestille en time?",
+    quickReplies: ["Jeg har smerter", "Bestille vurdering", "Trening / opptrening", "Ledige timer"],
+  },
+  psykolog: {
+    greeting: "Hei! Jeg er resepsjonisten her. Jeg kan hjelpe deg med å bestille time, svare på praktiske spørsmål eller informere om hva vi tilbyr.",
+    quickReplies: ["Ønsker samtale", "Første time", "Angst / stress", "Praktisk info"],
+  },
+  legeklinikk: {
+    greeting: "Hei! Jeg er resepsjonisten på legekontoret. Hva kan jeg hjelpe deg med i dag?",
+    quickReplies: ["Bestille legetime", "Fornye resept", "Blodprøve", "Åpningstider"],
+  },
+  kiropraktor: {
+    greeting: "Hei! Jeg er resepsjonisten på kiropraktorklinikken. Har du rygg- eller nakkeproblemer, eller vil du bestille time?",
+    quickReplies: ["Rygg / nakke", "Akutt time", "Første konsultasjon", "Bestille behandling"],
+  },
+};
+
+const DEFAULT_CONFIG: ClinicConfig = {
+  greeting: "Hei! Jeg er resepsjonisten her. Hva kan jeg hjelpe deg med?",
+  quickReplies: ["Book time", "Priser", "Åpningstider", "Kontakt oss"],
+};
+
+function getClinicConfig(clinicType: string): ClinicConfig {
+  const key = clinicType.toLowerCase().trim();
+  // Fuzzy match — "fysio" → "fysioterapi", "lege" → "legeklinikk" osv.
+  const match = Object.keys(CLINIC_CONFIG).find(k => k.startsWith(key) || key.startsWith(k));
+  return (match ? CLINIC_CONFIG[match] : null) ?? DEFAULT_CONFIG;
+}
+
 // ── Main widget ────────────────────────────────────────────────────────────
 
 export default function WidgetPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>(["Jeg har smerter", "Vil sjekke noe", "Book time", "Åpningstider"]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [blocked, setBlocked] = useState(false);
   const [booking, setBooking] = useState<BookingState>(INIT_BOOKING);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -308,13 +354,15 @@ export default function WidgetPage() {
       : Math.random().toString(36).slice(2)
   );
 
+  const clinicCfg = getClinicConfig(clinicType);
+
   useEffect(() => {
     fetch(`/api/widget-check?id=${encodeURIComponent(clinicId)}`)
       .then(res => {
         if (!res.ok) setBlocked(true);
-        else addAssistantMessage("Hei! Jeg er resepsjonisten her. Hva kan jeg hjelpe deg med?", ["Jeg har smerter", "Vil sjekke noe", "Book time", "Åpningstider"]);
+        else addAssistantMessage(clinicCfg.greeting, clinicCfg.quickReplies);
       })
-      .catch(() => addAssistantMessage("Hei! Jeg er resepsjonisten her. Hva kan jeg hjelpe deg med?", ["Jeg har smerter", "Vil sjekke noe", "Book time", "Åpningstider"]));
+      .catch(() => addAssistantMessage(clinicCfg.greeting, clinicCfg.quickReplies));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

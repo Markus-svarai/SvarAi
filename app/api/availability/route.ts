@@ -138,8 +138,25 @@ export async function GET(req: NextRequest) {
       `/bookings?clinic_id=eq.${encodeURIComponent(clinicId)}&date=eq.${encodeURIComponent(date)}&status=in.(pending,confirmed)`
     );
 
-    // Generer alle mulige slots for dagen
-    const allSlots = generateSlots(dayHours.open, dayHours.close, durationMinutes);
+    // Hent arbeidsplan for alle ansatte parallelt
+    const staffHoursMap = new Map<string, { open: string; close: string; closed: boolean } | null>();
+    await Promise.all(
+      staff.map(async (s: any) => {
+        try {
+          const rows = await sb(
+            `/clinic_staff_hours?staff_id=eq.${encodeURIComponent(s.id)}&day=eq.${encodeURIComponent(dayName)}&limit=1`
+          );
+          if (rows && rows.length > 0) {
+            staffHoursMap.set(s.id, rows[0]);
+          } else {
+            // Ingen timeplan satt – ansatt er ikke tilgjengelig (krever oppsett)
+            staffHoursMap.set(s.id, null);
+          }
+        } catch {
+          staffHoursMap.set(s.id, null);
+        }
+      })
+    );
 
     // Hent iCal-opptatthet for alle ansatte parallelt
     const icalBusyMap = new Map<string, Awaited<ReturnType<typeof fetchBusyBlocks>>>();
@@ -152,12 +169,32 @@ export async function GET(req: NextRequest) {
       })
     );
 
+    // Samle alle mulige slots på tvers av ansattes arbeidstider
+    const allSlotTimes = new Set<string>();
+    for (const s of staff) {
+      const sh = staffHoursMap.get(s.id);
+      if (!sh || sh.closed) continue;
+      const staffSlots = generateSlots(sh.open, sh.close, durationMinutes);
+      staffSlots.forEach(t => allSlotTimes.add(t));
+    }
+
+    // Sorter slottene kronologisk
+    const sortedSlots = Array.from(allSlotTimes).sort();
+
     // For hvert slot: finn hvilke ansatte som er ledige
     const result: AvailabilitySlot[] = [];
 
-    for (const slotTime of allSlots) {
+    for (const slotTime of sortedSlots) {
       const availableStaff = staff.filter((s: any) => {
-        // 1) Sjekk SvarAI-bookinger
+        // 1) Sjekk at ansatt jobber på dette tidspunktet
+        const sh = staffHoursMap.get(s.id);
+        if (!sh || sh.closed) return false;
+        const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+        const slotStart = toMin(slotTime);
+        const slotEnd = slotStart + durationMinutes;
+        if (slotStart < toMin(sh.open) || slotEnd > toMin(sh.close)) return false;
+
+        // 2) Sjekk SvarAI-bookinger
         const staffBookings = bookings.filter((b: any) => b.staff_id === s.id);
         const busyInDb = staffBookings.some((b: any) => {
           const bookDuration = b.duration_minutes ?? durationMinutes;
@@ -165,11 +202,9 @@ export async function GET(req: NextRequest) {
         });
         if (busyInDb) return false;
 
-        // 2) Sjekk iCal-kalender (Google, Visma, Outlook etc.)
+        // 3) Sjekk iCal-kalender (Google, Outlook etc.)
         const icalBusy = icalBusyMap.get(s.id);
-        if (icalBusy && isBlockedByIcal(slotTime, durationMinutes, icalBusy)) {
-          return false;
-        }
+        if (icalBusy && isBlockedByIcal(slotTime, durationMinutes, icalBusy)) return false;
 
         return true;
       });

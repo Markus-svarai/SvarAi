@@ -52,7 +52,10 @@ const EXAMPLE_QUESTIONS: Record<string, { q: string; hint: string }[]> = {
 
 function getExamples(clinicType: string) {
   const key = clinicType.toLowerCase().trim();
-  return EXAMPLE_QUESTIONS[key] ?? [
+  // Exact match first, then fuzzy (prefix match either direction)
+  if (EXAMPLE_QUESTIONS[key]) return EXAMPLE_QUESTIONS[key];
+  const fuzzy = Object.keys(EXAMPLE_QUESTIONS).find(k => k.startsWith(key) || key.startsWith(k));
+  return (fuzzy ? EXAMPLE_QUESTIONS[fuzzy] : null) ?? [
     { q: `Jeg trenger hjelp med noe`, hint: "Henvendelse" },
     { q: `Hva koster en time?`, hint: "Priser" },
     { q: `Jeg vil booke en time`, hint: "Booking-flyt" },
