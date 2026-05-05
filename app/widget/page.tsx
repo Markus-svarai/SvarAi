@@ -332,6 +332,10 @@ type ClinicConfig = {
 };
 
 const CLINIC_CONFIG: Record<string, ClinicConfig> = {
+  hoslinda: {
+    greeting: "Hei! Jeg er assistenten til Linda. Lurer du på priser, tjenester eller vil booke time?",
+    quickReplies: ["Priser på klipp", "Fargebehandling", "Booke time", "Åpningstider"],
+  },
   tannklinikk: {
     greeting: "Hei! Jeg er resepsjonisten på tannklinikken. Har du tannpine, vil bestille kontroll eller trenger en time?",
     quickReplies: ["Jeg har vondt i en tann", "Bestille kontroll", "Akutt time", "Endre time"],
@@ -363,8 +367,13 @@ const DEFAULT_CONFIG: ClinicConfig = {
   quickReplies: ["Book time", "Priser", "Åpningstider", "Kontakt oss"],
 };
 
-function getClinicConfig(clinicType: string): ClinicConfig {
+function getClinicConfig(clinicType: string, clinicId?: string): ClinicConfig {
+  // Sjekk eksakt clinicId først (for pilotklinikker som hoslinda)
+  if (clinicId && CLINIC_CONFIG[clinicId.toLowerCase()]) {
+    return CLINIC_CONFIG[clinicId.toLowerCase()];
+  }
   const key = clinicType.toLowerCase().trim();
+  if (!key) return DEFAULT_CONFIG;
   // Fuzzy match — "fysio" → "fysioterapi", "lege" → "legeklinikk" osv.
   const match = Object.keys(CLINIC_CONFIG).find(k => k.startsWith(key) || key.startsWith(k));
   return (match ? CLINIC_CONFIG[match] : null) ?? DEFAULT_CONFIG;
@@ -397,7 +406,7 @@ export default function WidgetPage() {
       : Math.random().toString(36).slice(2)
   );
 
-  const clinicCfg = getClinicConfig(clinicType);
+  const clinicCfg = getClinicConfig(clinicType, clinicId);
 
   useEffect(() => {
     fetch(`/api/widget-check?id=${encodeURIComponent(clinicId)}`)
