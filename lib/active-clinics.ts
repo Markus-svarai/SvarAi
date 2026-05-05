@@ -8,6 +8,7 @@
  */
 export const activeClinics: Set<string> = new Set([
   "demo",
+  "hoslinda",
   // Legg til betalende klinikker her:
   // "tannklinikken-oslo",
   // "hudklinikk-bergen",
