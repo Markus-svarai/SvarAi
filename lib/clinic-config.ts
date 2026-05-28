@@ -37,26 +37,26 @@ export type ClinicConfig = {
 };
 
 export const clinicConfig: ClinicConfig = {
-  name: "Din Klinikk AS",
+  name: "Moss Tannklinikk",
   type: "tannlege",
-  tagline: "Trygg tannbehandling for hele familien",
+  tagline: "Trygg og moderne tannbehandling i hjertet av Moss",
   address: {
-    street: "Eksempelgaten 1",
-    postalCode: "0001",
-    city: "Oslo",
+    street: "Storgata 22",
+    postalCode: "1530",
+    city: "Moss",
     country: "Norge",
   },
   contact: {
-    phone: "+47 22 00 11 22",
-    email: "",
-    website: "www.dinklinikk.no",
+    phone: "+47 69 20 10 10",
+    email: "post@mosstannklinikk.no",
+    website: "www.mosstannklinikk.no",
   },
   openingHours: [
-    { day: "Mandag",   open: "08:00", close: "17:00" },
-    { day: "Tirsdag",  open: "08:00", close: "17:00" },
-    { day: "Onsdag",   open: "08:00", close: "17:00" },
-    { day: "Torsdag",  open: "08:00", close: "19:00" },
-    { day: "Fredag",   open: "08:00", close: "15:00" },
+    { day: "Mandag",   open: "08:00", close: "16:00" },
+    { day: "Tirsdag",  open: "08:00", close: "16:00" },
+    { day: "Onsdag",   open: "08:00", close: "16:00" },
+    { day: "Torsdag",  open: "08:00", close: "18:00" },
+    { day: "Fredag",   open: "08:00", close: "14:00" },
     { day: "Lørdag",   open: null,    close: null },
     { day: "Søndag",   open: null,    close: null },
   ],
@@ -64,14 +64,14 @@ export const clinicConfig: ClinicConfig = {
     {
       id: "akutt",
       name: "Akuttkonsultasjon",
-      description: "Rask hjelp ved tannpine, hevelse eller brukket tann. Vi ser på deg samme dag.",
+      description: "Rask hjelp ved tannpine, hevelse eller brukket tann. Vi prioriterer deg samme dag.",
       durationMinutes: 30,
       priceNok: 890,
     },
     {
       id: "undersokelse",
       name: "Undersøkelse og røntgen",
-      description: "Full undersøkelse av tenner og tannkjøtt, inkludert røntgenbilde.",
+      description: "Full undersøkelse av tenner og tannkjøtt, inkludert digitalt røntgenbilde.",
       durationMinutes: 45,
       priceNok: 790,
     },
@@ -107,7 +107,7 @@ export const clinicConfig: ClinicConfig = {
   cancellationPolicy:
     "Avbestilling må gjøres senest 24 timer før timen. Ved senere avbestilling eller uteblivelse belastes et gebyr på 490 kr.",
   bookingLeadHours: 2,
-  bufferMinutes: 0,
+  bufferMinutes: 10,
   blockedDates: [],
 };
 
@@ -124,14 +124,14 @@ const DEMO_OPENING_HOURS: OpeningHour[] = [
 ];
 
 const DEMO_ADDRESS = {
-  street: "Storgata 12",
-  postalCode: "0155",
-  city: "Oslo",
+  street: "Storgata 22",
+  postalCode: "1530",
+  city: "Moss",
   country: "Norge",
 };
 
 const DEMO_CONTACT = {
-  phone: "+47 22 00 11 22",
+  phone: "+47 69 20 10 10",
   email: "post@klinikken.no",
   website: "www.klinikken.no",
 };
